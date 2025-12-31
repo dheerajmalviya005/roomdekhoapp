@@ -1,7 +1,10 @@
 import 'dart:math' as math;
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,14 +13,70 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// -------------------- DATA MODELS --------------------
+/* -------------------- Responsive scaling -------------------- */
+class R {
+  final double w;
+  final double h;
+  R(this.w, this.h);
+
+  double s(double size) => (w / 375.0) * size; // scale
+  double vs(double size) => (h / 667.0) * size; // verticalScale
+  double ms(double size, [double factor = 0.5]) =>
+      size + (s(size) - size) * factor; // moderateScale
+}
+
+/* -------------------- Theme Tokens -------------------- */
+class Toks {
+  final Color background;
+  final Color surface;
+  final Color elevated;
+  final Color border;
+  final Color primary;
+  final Color onPrimary;
+  final Color onBackground;
+  final Color muted;
+  final Color accent;
+  final Color ripple;
+
+  const Toks({
+    required this.background,
+    required this.surface,
+    required this.elevated,
+    required this.border,
+    required this.primary,
+    required this.onPrimary,
+    required this.onBackground,
+    required this.muted,
+    required this.accent,
+    required this.ripple,
+  });
+
+  factory Toks.fromTheme(BuildContext context) {
+    final th = Theme.of(context);
+    final cs = th.colorScheme;
+
+    return Toks(
+      background: cs.surface,
+      surface: cs.surfaceContainerHighest.withOpacity(0.55),
+      elevated: cs.surfaceContainerHighest,
+      border: cs.outlineVariant.withOpacity(0.55),
+      primary: cs.primary,
+      onPrimary: cs.onPrimary,
+      onBackground: cs.onSurface,
+      muted: cs.onSurface.withOpacity(0.6),
+      accent: cs.primary.withOpacity(0.15),
+      ripple: cs.primary.withOpacity(0.10),
+    );
+  }
+}
+
+/* -------------------- DATA MODELS -------------------- */
 class BannerItem {
   final String id;
   final String title;
   final String sub;
   final String asset;
   final List<Color> gradient;
-
   const BannerItem({
     required this.id,
     required this.title,
@@ -35,7 +94,7 @@ class PosterItem {
   final List<Color> gradient;
   final IconData icon;
   final String timeLeft;
-  final String asset;
+  final String bgAsset;
   final String? discount;
   final String? reward;
   final String? offer;
@@ -48,11 +107,13 @@ class PosterItem {
     required this.gradient,
     required this.icon,
     required this.timeLeft,
-    required this.asset,
+    required this.bgAsset,
     this.discount,
     this.reward,
     this.offer,
   });
+
+  String get badgeText => discount ?? reward ?? offer ?? "";
 }
 
 class CategoryItem {
@@ -90,247 +151,233 @@ class PropertyItem {
   });
 }
 
-// -------------------- MAIN --------------------
+/* -------------------- STATIC DATA -------------------- */
+const _assets = (
+  a0: "assets/icon/splash.png",
+  a1: "assets/icon/png-transparent-reset-password-illustration-removebg-preview.png",
+  a2: "assets/icon/splash.png", // ✅ fixed typo
+);
+
+final List<BannerItem> BANNERS = [
+  BannerItem(
+    id: "b1",
+    title: "Early Bird Discounts",
+    sub: "Book now & save up to 25%",
+    asset: _assets.a0,
+    gradient: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+  ),
+  BannerItem(
+    id: "b2",
+    title: "Zero Brokerage",
+    sub: "Direct verified properties only",
+    asset: _assets.a1,
+    gradient: [Color(0xFF4ECDC4), Color(0xFF44A08D)],
+  ),
+  BannerItem(
+    id: "b3",
+    title: "Group Bookings",
+    sub: "Extra benefits for 3+ friends",
+    asset: _assets.a2,
+    gradient: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+  ),
+];
+
+final List<PosterItem> POSTERS = [
+  PosterItem(
+    id: "ad1",
+    title: "Pre-Book Exclusive",
+    description: "Get ₹2000 Cashback + Free Relocation",
+    code: "STU2000",
+    gradient: [Color(0xFFFF0080), Color(0xFFFF8C00)],
+    icon: MdiIcons.giftOutline,
+    timeLeft: "2 days left",
+    bgAsset: _assets.a0,
+    discount: "20% OFF",
+  ),
+  PosterItem(
+    id: "ad2",
+    title: "Refer & Earn",
+    description: "Refer friends and earn up to ₹5000",
+    code: "REFER500",
+    gradient: [Color(0xFF00B4DB), Color(0xFF0083B0)],
+    icon: MdiIcons.accountGroup,
+    timeLeft: "Limited time",
+    bgAsset: _assets.a1,
+    reward: "₹5000",
+  ),
+  PosterItem(
+    id: "ad3",
+    title: "Festival Special",
+    description: "Diwali Dhamaka - No Security Deposit",
+    code: "DIWALI23",
+    gradient: [Color(0xFF7F00FF), Color(0xFFE100FF)],
+    icon: MdiIcons.firework,
+    timeLeft: "1 week left",
+    bgAsset: _assets.a2,
+    offer: "No Deposit",
+  ),
+];
+
+final List<CategoryItem> CATEGORIES = [
+  CategoryItem(
+    id: "c1",
+    icon: MdiIcons.homeCityOutline,
+    label: "Apartments",
+    color: Color(0xFFFF6B6B),
+  ),
+  CategoryItem(
+    id: "c2",
+    icon: MdiIcons.homeHeart,
+    label: "Studios",
+    color: Color(0xFF4ECDC4),
+  ),
+  CategoryItem(
+    id: "c3",
+    icon: MdiIcons.homeGroup,
+    label: "Shared Rooms",
+    color: Color(0xFF8E2DE2),
+  ),
+  CategoryItem(
+    id: "c4",
+    icon: MdiIcons.shieldCheck,
+    label: "Verified",
+    color: Color(0xFFFFD166),
+  ),
+  CategoryItem(
+    id: "c5",
+    icon: MdiIcons.currencyInr,
+    label: "Budget",
+    color: Color(0xFF06D6A0),
+  ),
+  CategoryItem(
+    id: "c6",
+    icon: MdiIcons.mapMarkerRadiusOutline,
+    label: "Near Campus",
+    color: Color(0xFF118AB2),
+  ),
+];
+
+final List<PropertyItem> PROPERTIES = [
+  PropertyItem(
+    id: "p1",
+    title: "City View Residency",
+    area: "Near ABC University",
+    price: "₹11,500/mo",
+    rating: 4.8,
+    distance: "1.2 km",
+    asset: _assets.a0,
+    features: ["AC", "WiFi", "Laundry"],
+  ),
+  PropertyItem(
+    id: "p2",
+    title: "Green Park Studios",
+    area: "5 min from campus",
+    price: "₹14,000/mo",
+    rating: 4.6,
+    distance: "800 m",
+    asset: _assets.a1,
+    features: ["Furnished", "Gym", "Parking"],
+  ),
+  PropertyItem(
+    id: "p3",
+    title: "Riverside PG",
+    area: "Downtown Location",
+    price: "₹9,500/mo",
+    rating: 4.4,
+    distance: "2.1 km",
+    asset: _assets.a2,
+    features: ["Food", "Security", "Cleaning"],
+  ),
+  PropertyItem(
+    id: "p4",
+    title: "Campus Heights",
+    area: "Walking distance to college",
+    price: "₹12,800/mo",
+    rating: 4.9,
+    distance: "500 m",
+    asset: _assets.a0,
+    features: ["Study Room", "Cafeteria", "24/7 Power"],
+  ),
+];
+
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  // ---- controllers ----
-  final PageController _bannerCtrl = PageController();
-  late final PageController _posterCtrl;
+  late final AnimationController _headerCtrl;
+  late final AnimationController _searchCtrl;
+  late final AnimationController _catCtrl;
+  late final AnimationController _posterCtrl;
+  late final AnimationController _cardCtrl;
 
-  // ---- intro anims like RN ----
-  late final AnimationController _intro;
-  late final Animation<double> _headerA;
-  late final Animation<double> _searchA;
-  late final Animation<double> _catA;
-  late final Animation<double> _posterA;
-  late final Animation<double> _cardA;
+  late final PageController _bannerPC;
+  late PageController _posterPC;
 
-  // ---- state ----
-  final Map<String, bool> _liked = {};
+  double _bannerPage = 0;
+  double _posterPage = 0;
+
   String _activeCategory = "c1";
   bool _searchFocused = false;
   bool _hasFilters = false;
   String? _copiedCode;
 
-  double _bannerPage = 0;
-  double _posterPage = 0;
-
-  static const double _tabBarSpace = 80;
-
-  static const List<BannerItem> BANNERS = [
-    BannerItem(
-      id: "b1",
-      title: "Early Bird Discounts",
-      sub: "Book now & save up to 25%",
-      asset: "assets/icon/splash.png",
-      gradient: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-    ),
-    BannerItem(
-      id: "b2",
-      title: "Zero Brokerage",
-      sub: "Direct verified properties only",
-      asset:
-          "assets/icon/png-transparent-reset-password-illustration-removebg-preview.png",
-      gradient: [Color(0xFF4ECDC4), Color(0xFF44A08D)],
-    ),
-    BannerItem(
-      id: "b3",
-      title: "Group Bookings",
-      sub: "Extra benefits for 3+ friends",
-      asset:
-          "assets/icon/pngtree-worries-before-exams-isolated-cartoon-vector-illustrations-picture-image_8710545.png",
-      gradient: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
-    ),
-  ];
-
-  static final List<PosterItem> POSTERS = [
-    PosterItem(
-      id: "ad1",
-      title: "Pre-Book Exclusive",
-      description: "Get ₹2000 Cashback + Free Relocation",
-      code: "STU2000",
-      gradient: const [Color(0xFFFF0080), Color(0xFFFF8C00)],
-      icon: MdiIcons.giftOutline,
-      timeLeft: "2 days left",
-      asset: "assets/icon/splash.png",
-      discount: "20% OFF",
-    ),
-    PosterItem(
-      id: "ad2",
-      title: "Refer & Earn",
-      description: "Refer friends and earn up to ₹5000",
-      code: "REFER500",
-      gradient: const [Color(0xFF00B4DB), Color(0xFF0083B0)],
-      icon: MdiIcons.accountGroup,
-      timeLeft: "Limited time",
-      asset:
-          "assets/icon/png-transparent-reset-password-illustration-removebg-preview.png",
-      reward: "₹5000",
-    ),
-    PosterItem(
-      id: "ad3",
-      title: "Festival Special",
-      description: "Diwali Dhamaka - No Security Deposit",
-      code: "DIWALI23",
-      gradient: const [Color(0xFF7F00FF), Color(0xFFE100FF)],
-      icon: MdiIcons.partyPopper, // ✅ festival ki jagah (safe icon)
-      timeLeft: "1 week left",
-      asset:
-          "assets/icon/pngtree-worries-before-exams-isolated-cartoon-vector-illustrations-picture-image_8710545.png",
-      offer: "No Deposit",
-    ),
-  ];
-
-  static final List<CategoryItem> CATEGORIES = [
-    CategoryItem(
-      id: "c1",
-      icon: MdiIcons.homeCityOutline,
-      label: "Apartments",
-      color: Color(0xFFFF6B6B),
-    ),
-    CategoryItem(
-      id: "c2",
-      icon: MdiIcons.homeHeart,
-      label: "Studios",
-      color: Color(0xFF4ECDC4),
-    ),
-    CategoryItem(
-      id: "c3",
-      icon: MdiIcons.homeGroup,
-      label: "Shared Rooms",
-      color: Color(0xFF8E2DE2),
-    ),
-    CategoryItem(
-      id: "c4",
-      icon: MdiIcons.shieldCheck,
-      label: "Verified",
-      color: Color(0xFFFFD166),
-    ),
-    CategoryItem(
-      id: "c5",
-      icon: MdiIcons.currencyInr,
-      label: "Budget",
-      color: Color(0xFF06D6A0),
-    ),
-    CategoryItem(
-      id: "c6",
-      icon: MdiIcons.mapMarkerRadiusOutline,
-      label: "Near Campus",
-      color: Color(0xFF118AB2),
-    ),
-  ];
-
-  static const List<PropertyItem> PROPERTIES = [
-    PropertyItem(
-      id: "p1",
-      title: "City View Residency",
-      area: "Near ABC University",
-      price: "₹11,500/mo",
-      rating: 4.8,
-      distance: "1.2 km",
-      asset: "assets/icon/splash.png",
-      features: ["AC", "WiFi", "Laundry"],
-    ),
-    PropertyItem(
-      id: "p2",
-      title: "Green Park Studios",
-      area: "5 min from campus",
-      price: "₹14,000/mo",
-      rating: 4.6,
-      distance: "800 m",
-      asset:
-          "assets/icon/png-transparent-reset-password-illustration-removebg-preview.png",
-      features: ["Furnished", "Gym", "Parking"],
-    ),
-    PropertyItem(
-      id: "p3",
-      title: "Riverside PG",
-      area: "Downtown Location",
-      price: "₹9,500/mo",
-      rating: 4.4,
-      distance: "2.1 km",
-      asset:
-          "assets/icon/pngtree-worries-before-exams-isolated-cartoon-vector-illustrations-picture-image_8710545.png",
-      features: ["Food", "Security", "Cleaning"],
-    ),
-    PropertyItem(
-      id: "p4",
-      title: "Campus Heights",
-      area: "Walking distance to college",
-      price: "₹12,800/mo",
-      rating: 4.9,
-      distance: "500 m",
-      asset: "assets/icon/splash.png",
-      features: ["Study Room", "Cafeteria", "24/7 Power"],
-    ),
-  ];
+  final Map<String, bool> _liked = {};
 
   @override
   void initState() {
     super.initState();
 
-    _posterCtrl = PageController(viewportFraction: 0.82);
-
-    _intro = AnimationController(
+    _headerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _searchCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 750),
+    );
+    _catCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _posterCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+    _cardCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
 
-    _headerA = CurvedAnimation(
-      parent: _intro,
-      curve: const Interval(0.00, 0.35, curve: Curves.easeOut),
-    );
-    _searchA = CurvedAnimation(
-      parent: _intro,
-      curve: const Interval(0.10, 0.55, curve: Curves.easeOut),
-    );
-    _catA = CurvedAnimation(
-      parent: _intro,
-      curve: const Interval(0.20, 0.70, curve: Curves.easeOut),
-    );
-    _posterA = CurvedAnimation(
-      parent: _intro,
-      curve: const Interval(0.30, 0.85, curve: Curves.easeOut),
-    );
-    _cardA = CurvedAnimation(
-      parent: _intro,
-      curve: const Interval(0.40, 1.00, curve: Curves.easeOut),
-    );
+    _bannerPC = PageController(viewportFraction: 1.0)
+      ..addListener(() {
+        setState(() => _bannerPage = _bannerPC.page ?? 0);
+      });
 
-    _intro.forward();
+    _posterPC = PageController(viewportFraction: 0.78)
+      ..addListener(() {
+        setState(() => _posterPage = _posterPC.page ?? 0);
+      });
 
-    _bannerCtrl.addListener(() {
-      final p = _bannerCtrl.page ?? 0;
-      setState(() => _bannerPage = p);
-    });
-
-    _posterCtrl.addListener(() {
-      final p = _posterCtrl.page ?? 0;
-      setState(() => _posterPage = p);
+    Future.microtask(() async {
+      _headerCtrl.forward();
+      await Future.delayed(const Duration(milliseconds: 100));
+      _searchCtrl.forward();
+      await Future.delayed(const Duration(milliseconds: 100));
+      _catCtrl.forward();
+      await Future.delayed(const Duration(milliseconds: 100));
+      _posterCtrl.forward();
+      await Future.delayed(const Duration(milliseconds: 100));
+      _cardCtrl.forward();
     });
   }
 
   @override
   void dispose() {
-    _bannerCtrl.dispose();
+    _bannerPC.dispose();
+    _posterPC.dispose();
+    _headerCtrl.dispose();
+    _searchCtrl.dispose();
+    _catCtrl.dispose();
     _posterCtrl.dispose();
-    _intro.dispose();
+    _cardCtrl.dispose();
     super.dispose();
-  }
-
-  // ---- RN size-matters style scaling (same spirit) ----
-  double _scale(BuildContext context, double v) {
-    final w = MediaQuery.of(context).size.width;
-    return (w / 375.0) * v;
-  }
-
-  double _vScale(BuildContext context, double v) {
-    final h = MediaQuery.of(context).size.height;
-    return (h / 667.0) * v;
-  }
-
-  double _mScale(BuildContext context, double v, [double factor = 0.5]) {
-    final s = _scale(context, v);
-    return v + (s - v) * factor;
   }
 
   void _toggleLike(String id) {
@@ -339,89 +386,78 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  void _copyCouponCode(String code) async {
+  void _copyCoupon(String code) async {
     setState(() => _copiedCode = code);
     await Clipboard.setData(ClipboardData(text: code));
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _copiedCode = null);
-    });
-  }
-
-  // -------------------- WIDGETS --------------------
-  Widget _dotsBar({
-    required BuildContext context,
-    required int count,
-    required double page,
-    required Color activeColor,
-    required double height,
-    required double minW,
-    required double maxW,
-  }) {
-    final s = _scale(context, 1);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(count, (i) {
-        final t = (1 - (page - i).abs()).clamp(0.0, 1.0);
-        final w = minW + (maxW - minW) * t;
-        final opacity = 0.3 + (1.0 - 0.3) * t;
-
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          margin: EdgeInsets.symmetric(horizontal: _scale(context, 4)),
-          width: w * s,
-          height: height * s,
-          decoration: BoxDecoration(
-            color: activeColor.withOpacity(opacity),
-            borderRadius: BorderRadius.circular((height / 2) * s),
-          ),
-        );
-      }),
-    );
+    await Future.delayed(const Duration(milliseconds: 2000));
+    if (!mounted) return;
+    setState(() => _copiedCode = null);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final mq = MediaQuery.of(context);
+    final r = R(mq.size.width, mq.size.height);
+    final T = Toks.fromTheme(context);
 
-    // ---- Theme mapping like your RN T ----
-    final Tbackground = cs.surface;
-    final Tsurface = cs.surface;
-    final Televated = cs.surfaceContainerHighest; // close to elevated look
-    final Tborder = cs.outlineVariant;
-    final Tprimary = cs.primary;
-    final TonPrimary = cs.onPrimary;
-    final TonBackground = cs.onSurface;
-    final Tmuted = cs.onSurface.withOpacity(0.65);
-    final Tripple = cs.surfaceTint.withOpacity(0.10);
+    final tabBarSpace = r.vs(80);
 
-    final topProperties = PROPERTIES.take(3).toList();
-    final remainingProperties = PROPERTIES.skip(3).toList();
+    final topProps = PROPERTIES.take(3).toList();
+    final remainingProps = PROPERTIES.skip(3).toList();
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: Tbackground,
-        body: AnnotatedRegion<SystemUiOverlayStyle>(
-          value: theme.brightness == Brightness.dark
-              ? SystemUiOverlayStyle.light
-              : SystemUiOverlayStyle.dark,
-          child: Column(
+    // 🔥 Almost full-width cards
+    final posterVF = mq.size.width < 380 ? 0.94 : 0.90;
+
+    if ((_posterPC.viewportFraction - posterVF).abs() > 0.001) {
+      final old = _posterPC;
+      _posterPC =
+          PageController(
+            viewportFraction: posterVF,
+            initialPage: old.initialPage,
+          )..addListener(() {
+            setState(() => _posterPage = _posterPC.page ?? 0);
+          });
+    }
+
+    // ✅ equal spacing token
+    final sectionGap = r.vs(22);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: T.background,
+        statusBarIconBrightness: Theme.of(context).brightness == Brightness.dark
+            ? Brightness.light
+            : Brightness.dark,
+        statusBarBrightness: Theme.of(context).brightness == Brightness.dark
+            ? Brightness.dark
+            : Brightness.light,
+      ),
+      child: SafeArea(
+        child: Scaffold(
+          backgroundColor: T.background,
+          body: Column(
             children: [
-              // ---------------- HEADER ----------------
+              // ---------------- Header (Animated) ----------------
               FadeTransition(
-                opacity: _headerA,
+                opacity: CurvedAnimation(
+                  parent: _headerCtrl,
+                  curve: Curves.easeOut,
+                ),
                 child: SlideTransition(
-                  position: _headerA.drive(
-                    Tween(
-                      begin: const Offset(0, -0.25),
-                      end: Offset.zero,
-                    ).chain(CurveTween(curve: Curves.easeOut)),
-                  ),
+                  position:
+                      Tween<Offset>(
+                        begin: const Offset(0, -0.15),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: _headerCtrl,
+                          curve: Curves.easeOut,
+                        ),
+                      ),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: _scale(context, 20),
-                      vertical: _vScale(context, 10),
+                      horizontal: r.s(20),
+                      vertical: r.vs(10),
                     ),
                     child: Row(
                       children: [
@@ -430,27 +466,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             children: [
                               Icon(
                                 MdiIcons.mapMarkerRadius,
-                                size: _mScale(context, 22),
-                                color: Tprimary,
+                                size: r.ms(22),
+                                color: T.primary,
                               ),
-                              SizedBox(width: _scale(context, 10)),
+                              SizedBox(width: r.s(10)),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     "Current Location",
                                     style: TextStyle(
-                                      fontSize: _mScale(context, 14),
+                                      fontSize: r.ms(14),
                                       fontWeight: FontWeight.w700,
-                                      color: TonBackground,
+                                      color: T.onBackground,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
+                                  SizedBox(height: r.vs(2)),
                                   Text(
                                     "University Campus Area",
                                     style: TextStyle(
-                                      fontSize: _mScale(context, 12),
-                                      color: Tmuted,
+                                      fontSize: r.ms(12),
+                                      color: T.muted,
                                     ),
                                   ),
                                 ],
@@ -459,18 +495,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
 
-                        // BellBadge (simple)
-                        _BellBadge(
-                          count: 3,
-                          bg: cs.secondary,
-                          iconColor: TonPrimary,
-                          badgeBg: Tprimary,
-                          badgeText: TonPrimary,
-                          onTap: () => Navigator.pushNamed(
-                            context,
-                            "NotificationScreen",
+                        // ✅ Notification / Bell (fixed size + look)
+                        GestureDetector(
+                          onTap: () {
+                            context.pushNamed('notification');
+                          },
+                          child: Container(
+                            width: r.s(36),
+                            height: r.s(36),
+                            decoration: BoxDecoration(
+                              color: T.elevated,
+                              borderRadius: BorderRadius.circular(r.s(14)),
+                              border: Border.all(color: T.border, width: 1),
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(
+                                  MdiIcons.bellOutline,
+                                  size: r.ms(18),
+                                  color: T.onBackground,
+                                ),
+                                Positioned(
+                                  right: r.s(2),
+                                  top: r.s(-3),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: r.s(5),
+                                      vertical: r.vs(1.5),
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: T.primary,
+                                      borderRadius: BorderRadius.circular(
+                                        r.s(10),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "3",
+                                      style: TextStyle(
+                                        fontSize: r.ms(10),
+                                        fontWeight: FontWeight.w900,
+                                        color: T.onPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          size: _scale(context, 26),
                         ),
                       ],
                     ),
@@ -478,28 +551,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
 
-              // ---------------- SEARCH ----------------
+              // ---------------- Search (Animated) ----------------
               FadeTransition(
-                opacity: _searchA,
+                opacity: CurvedAnimation(
+                  parent: _searchCtrl,
+                  curve: Curves.easeOut,
+                ),
                 child: SlideTransition(
-                  position: _searchA.drive(
-                    Tween(
-                      begin: const Offset(0, -0.15),
-                      end: Offset.zero,
-                    ).chain(CurveTween(curve: Curves.easeOut)),
-                  ),
+                  position:
+                      Tween<Offset>(
+                        begin: const Offset(0, -0.12),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: _searchCtrl,
+                          curve: Curves.easeOut,
+                        ),
+                      ),
                   child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: _scale(context, 20),
+                    padding: EdgeInsets.fromLTRB(
+                      r.s(20),
+                      r.vs(5),
+                      r.s(20),
+                      r.vs(10),
                     ),
                     child: Container(
-                      height: _vScale(context, 42),
+                      height: r.vs(42),
                       decoration: BoxDecoration(
-                        color: Tsurface,
-                        borderRadius: BorderRadius.circular(
-                          _scale(context, 12),
-                        ),
-                        border: Border.all(color: Tborder, width: 1),
+                        color: T.surface,
+                        borderRadius: BorderRadius.circular(r.s(12)),
+                        border: Border.all(color: T.border, width: 1),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
@@ -513,30 +594,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           Expanded(
                             child: Padding(
                               padding: EdgeInsets.symmetric(
-                                horizontal: _scale(context, 12),
+                                horizontal: r.s(12),
                               ),
                               child: Row(
                                 children: [
                                   Icon(
                                     MdiIcons.magnify,
-                                    size: _mScale(context, 18),
-                                    color: Tmuted,
+                                    size: r.ms(18),
+                                    color: T.muted,
                                   ),
-                                  SizedBox(width: _scale(context, 10)),
+                                  SizedBox(width: r.s(10)),
                                   Expanded(
                                     child: Focus(
                                       onFocusChange: (f) =>
                                           setState(() => _searchFocused = f),
                                       child: TextField(
+                                        style: TextStyle(
+                                          fontSize: r.ms(14),
+                                          color: T.onBackground,
+                                        ),
                                         decoration: InputDecoration(
-                                          border: InputBorder.none,
                                           hintText:
                                               "Search properties or areas...",
-                                          hintStyle: TextStyle(color: Tmuted),
-                                        ),
-                                        style: TextStyle(
-                                          color: TonBackground,
-                                          fontSize: _mScale(context, 14),
+                                          hintStyle: TextStyle(color: T.muted),
+                                          border: InputBorder.none,
+                                          isDense: true,
                                         ),
                                       ),
                                     ),
@@ -546,70 +628,54 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                           ),
                           Padding(
-                            padding: EdgeInsets.only(right: _scale(context, 8)),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                InkWell(
-                                  onTap: () => setState(
-                                    () => _hasFilters = !_hasFilters,
+                            padding: EdgeInsets.only(right: r.s(8)),
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _hasFilters = !_hasFilters),
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                opacity: _searchFocused ? 0.9 : 1.0,
+                                child: Container(
+                                  height: r.vs(42) * 0.80,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: r.s(14),
                                   ),
-                                  borderRadius: BorderRadius.circular(
-                                    _scale(context, 8),
+                                  decoration: BoxDecoration(
+                                    color: T.primary,
+                                    borderRadius: BorderRadius.circular(r.s(8)),
                                   ),
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 150),
-                                    opacity: _searchFocused ? 0.9 : 1,
-                                    child: Container(
-                                      height: _vScale(context, 42) * 0.80,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: _scale(context, 14),
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Icon(
+                                        MdiIcons.filterVariant,
+                                        size: r.ms(16),
+                                        color: T.onPrimary,
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: Tprimary,
-                                        borderRadius: BorderRadius.circular(
-                                          _scale(context, 8),
+                                      if (_hasFilters)
+                                        Positioned(
+                                          right: -6,
+                                          top: -6,
+                                          child: Container(
+                                            width: r.s(18),
+                                            height: r.s(18),
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFF4757),
+                                              borderRadius:
+                                                  BorderRadius.circular(r.s(9)),
+                                              border: Border.all(
+                                                color: T.surface,
+                                                width: 2,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                      child: Center(
-                                        child: Icon(
-                                          MdiIcons.filterVariant,
-                                          size: _mScale(context, 16),
-                                          color: TonPrimary,
-                                        ),
-                                      ),
-                                    ),
+                                    ],
                                   ),
                                 ),
-                                if (_hasFilters)
-                                  Positioned(
-                                    top: -6,
-                                    right: -6,
-                                    child: Container(
-                                      width: _scale(context, 18),
-                                      height: _scale(context, 18),
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFF4757),
-                                        borderRadius: BorderRadius.circular(
-                                          _scale(context, 9),
-                                        ),
-                                        border: Border.all(
-                                          color: Tsurface,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        "3",
-                                        style: TextStyle(
-                                          fontSize: _mScale(context, 10),
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                              ),
                             ),
                           ),
                         ],
@@ -619,299 +685,152 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
 
-              SizedBox(height: _vScale(context, 10)),
-
-              // ---------------- CONTENT ----------------
+              // ---------------- Content ----------------
               Expanded(
                 child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: _vScale(context, 20)),
-                    child: Column(
-                      children: [
-                        // ---------- Banner carousel ----------
-                        SizedBox(
-                          height: _vScale(context, 160) + _vScale(context, 32),
+                  padding: EdgeInsets.only(bottom: r.vs(16)),
+                  child: Column(
+                    children: [
+                      SizedBox(height: sectionGap),
+
+                      _BannerCarousel(
+                        r: r,
+                        T: T,
+                        page: _bannerPage,
+                        controller: _bannerPC,
+                      ),
+
+                      SizedBox(height: sectionGap),
+
+                      // -------- Categories --------
+                      FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: _catCtrl,
+                          curve: Curves.easeOut,
+                        ),
+                        child: SlideTransition(
+                          position:
+                              Tween<Offset>(
+                                begin: const Offset(0, 0.10),
+                                end: Offset.zero,
+                              ).animate(
+                                CurvedAnimation(
+                                  parent: _catCtrl,
+                                  curve: Curves.easeOut,
+                                ),
+                              ),
                           child: Column(
                             children: [
+                              _SectionHeader(
+                                r: r,
+                                T: T,
+                                title: "Browse Categories",
+                                rightText: "See all",
+                                onRightTap: () {},
+                              ),
+                              SizedBox(height: r.vs(8)),
                               SizedBox(
-                                height: _vScale(context, 160),
-                                child: PageView.builder(
-                                  controller: _bannerCtrl,
-                                  itemCount: BANNERS.length,
-                                  itemBuilder: (context, index) {
-                                    final item = BANNERS[index];
-                                    final t = (1 - (_bannerPage - index).abs())
-                                        .clamp(0.0, 1.0);
-                                    final scale = 0.9 + (1 - 0.9) * t;
+                                height: r.vs(110),
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: r.s(20),
+                                  ),
+                                  itemCount: CATEGORIES.length,
+                                  itemBuilder: (context, i) {
+                                    final c = CATEGORIES[i];
+                                    final active = _activeCategory == c.id;
 
-                                    return Transform.scale(
-                                      scale: scale,
-                                      child: Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: _scale(context, 20),
+                                    return Padding(
+                                      padding: EdgeInsets.only(right: r.s(12)),
+                                      child: GestureDetector(
+                                        onTap: () => setState(
+                                          () => _activeCategory = c.id,
                                         ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            _scale(context, 20),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(
+                                            milliseconds: 200,
                                           ),
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: item.gradient,
-                                                begin: Alignment.centerLeft,
-                                                end: Alignment.centerRight,
-                                              ),
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: r.s(15),
+                                            vertical: r.vs(12),
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: active ? c.color : T.surface,
+                                            borderRadius: BorderRadius.circular(
+                                              r.s(15),
                                             ),
-                                            child: Stack(
-                                              children: [
-                                                Padding(
-                                                  padding: EdgeInsets.all(
-                                                    _scale(context, 20),
-                                                  ),
-                                                  child: Row(
-                                                    children: [
-                                                      Expanded(
-                                                        child: Column(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .center,
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Container(
-                                                              padding:
-                                                                  EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        _scale(
-                                                                          context,
-                                                                          10,
-                                                                        ),
-                                                                    vertical:
-                                                                        _vScale(
-                                                                          context,
-                                                                          4,
-                                                                        ),
-                                                                  ),
-                                                              decoration: BoxDecoration(
-                                                                color: Colors
-                                                                    .white
-                                                                    .withOpacity(
-                                                                      0.20,
-                                                                    ),
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      _scale(
-                                                                        context,
-                                                                        20,
-                                                                      ),
-                                                                    ),
-                                                              ),
-                                                              child: Row(
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .min,
-                                                                children: [
-                                                                  Icon(
-                                                                    MdiIcons
-                                                                        .lightningBolt,
-                                                                    size: _mScale(
-                                                                      context,
-                                                                      14,
-                                                                    ),
-                                                                    color: Colors
-                                                                        .white,
-                                                                  ),
-                                                                  SizedBox(
-                                                                    width: _scale(
-                                                                      context,
-                                                                      5,
-                                                                    ),
-                                                                  ),
-                                                                  Text(
-                                                                    "LIMITED OFFER",
-                                                                    style: TextStyle(
-                                                                      fontSize:
-                                                                          _mScale(
-                                                                            context,
-                                                                            10,
-                                                                          ),
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w700,
-                                                                      color: Colors
-                                                                          .white,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                            SizedBox(
-                                                              height: _vScale(
-                                                                context,
-                                                                10,
-                                                              ),
-                                                            ),
-                                                            Text(
-                                                              item.title,
-                                                              style: TextStyle(
-                                                                fontSize:
-                                                                    _mScale(
-                                                                      context,
-                                                                      22,
-                                                                    ),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w800,
-                                                                color: Colors
-                                                                    .white,
-                                                              ),
-                                                            ),
-                                                            SizedBox(
-                                                              height: _vScale(
-                                                                context,
-                                                                5,
-                                                              ),
-                                                            ),
-                                                            Text(
-                                                              item.sub,
-                                                              style: TextStyle(
-                                                                fontSize:
-                                                                    _mScale(
-                                                                      context,
-                                                                      14,
-                                                                    ),
-                                                                color: Colors
-                                                                    .white
-                                                                    .withOpacity(
-                                                                      0.90,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                            SizedBox(
-                                                              height: _vScale(
-                                                                context,
-                                                                15,
-                                                              ),
-                                                            ),
-                                                            InkWell(
-                                                              onTap: () {},
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    _scale(
-                                                                      context,
-                                                                      12,
-                                                                    ),
-                                                                  ),
-                                                              child: Container(
-                                                                padding: EdgeInsets.symmetric(
-                                                                  horizontal:
-                                                                      _scale(
-                                                                        context,
-                                                                        16,
-                                                                      ),
-                                                                  vertical:
-                                                                      _vScale(
-                                                                        context,
-                                                                        8,
-                                                                      ),
-                                                                ),
-                                                                decoration: BoxDecoration(
-                                                                  color: Colors
-                                                                      .white
-                                                                      .withOpacity(
-                                                                        0.20,
-                                                                      ),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        _scale(
-                                                                          context,
-                                                                          12,
-                                                                        ),
-                                                                      ),
-                                                                  border: Border.all(
-                                                                    color: Colors
-                                                                        .white
-                                                                        .withOpacity(
-                                                                          0.30,
-                                                                        ),
-                                                                    width: 1,
-                                                                  ),
-                                                                ),
-                                                                child: Row(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  children: [
-                                                                    Text(
-                                                                      "Explore Now",
-                                                                      style: TextStyle(
-                                                                        fontSize: _mScale(
-                                                                          context,
-                                                                          13,
-                                                                        ),
-                                                                        fontWeight:
-                                                                            FontWeight.w700,
-                                                                        color: Colors
-                                                                            .white,
-                                                                      ),
-                                                                    ),
-                                                                    SizedBox(
-                                                                      width: _scale(
-                                                                        context,
-                                                                        5,
-                                                                      ),
-                                                                    ),
-                                                                    Icon(
-                                                                      MdiIcons
-                                                                          .arrowRight,
-                                                                      size: _mScale(
-                                                                        context,
-                                                                        16,
-                                                                      ),
-                                                                      color: Colors
-                                                                          .white,
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      SizedBox(
-                                                        width: _scale(
-                                                          context,
-                                                          10,
-                                                        ),
-                                                      ),
-                                                      ClipRRect(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              _scale(
-                                                                context,
-                                                                15,
-                                                              ),
-                                                            ),
-                                                        child: Image.asset(
-                                                          item.asset,
-                                                          width: _scale(
-                                                            context,
-                                                            120,
-                                                          ),
-                                                          height: _vScale(
-                                                            context,
-                                                            120,
-                                                          ),
-                                                          fit: BoxFit.cover,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
+                                            border: Border.all(
+                                              color: active
+                                                  ? c.color
+                                                  : T.border,
+                                              width: 2,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(
+                                                  active ? 0.20 : 0.10,
                                                 ),
-                                              ],
-                                            ),
+                                                blurRadius: active ? 8 : 6,
+                                                offset: Offset(
+                                                  0,
+                                                  active ? 4 : 2,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                width: r.s(45),
+                                                height: r.s(45),
+                                                decoration: BoxDecoration(
+                                                  color: active
+                                                      ? Colors.white
+                                                      : T.ripple,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        r.s(22.5),
+                                                      ),
+                                                  boxShadow: active
+                                                      ? [
+                                                          BoxShadow(
+                                                            color: Colors.black
+                                                                .withOpacity(
+                                                                  0.2,
+                                                                ),
+                                                            blurRadius: 4,
+                                                            offset:
+                                                                const Offset(
+                                                                  0,
+                                                                  2,
+                                                                ),
+                                                          ),
+                                                        ]
+                                                      : null,
+                                                ),
+                                                child: Icon(
+                                                  c.icon,
+                                                  size: r.ms(20),
+                                                  color: active
+                                                      ? c.color
+                                                      : T.onBackground,
+                                                ),
+                                              ),
+                                              SizedBox(height: r.vs(8)),
+                                              Text(
+                                                c.label,
+                                                style: TextStyle(
+                                                  fontSize: r.ms(12),
+                                                  fontWeight: FontWeight.w700,
+                                                  color: active
+                                                      ? Colors.white
+                                                      : T.onBackground,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
@@ -919,1168 +838,369 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   },
                                 ),
                               ),
-                              SizedBox(height: _vScale(context, 15)),
-                              _dotsBar(
-                                context: context,
-                                count: BANNERS.length,
-                                page: _bannerPage,
-                                activeColor: Tprimary,
-                                height: 8,
-                                minW: 8,
-                                maxW: 20,
-                              ),
                             ],
                           ),
                         ),
+                      ),
 
-                        // ---------- Categories ----------
+                      // -------- Top Picks --------
+                      if (topProps.isNotEmpty) ...[
+                        SizedBox(height: sectionGap),
                         FadeTransition(
-                          opacity: _catA,
+                          opacity: CurvedAnimation(
+                            parent: _cardCtrl,
+                            curve: Curves.easeOut,
+                          ),
                           child: SlideTransition(
-                            position: _catA.drive(
-                              Tween(
-                                begin: const Offset(0, 0.15),
-                                end: Offset.zero,
-                              ).chain(CurveTween(curve: Curves.easeOut)),
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.only(
-                                top: _vScale(context, 25),
-                              ),
-                              child: Column(
-                                children: [
-                                  _SectionHeader(
-                                    context: context,
-                                    title: "Browse Categories",
-                                    rightText: "See all",
-                                    titleColor: TonBackground,
-                                    rightColor: Tprimary,
-                                    onRightTap: () {},
+                            position:
+                                Tween<Offset>(
+                                  begin: const Offset(0, 0.10),
+                                  end: Offset.zero,
+                                ).animate(
+                                  CurvedAnimation(
+                                    parent: _cardCtrl,
+                                    curve: Curves.easeOut,
                                   ),
-                                  SizedBox(
-                                    height: _vScale(context, 104),
-                                    child: ListView.builder(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: _scale(context, 20),
-                                      ),
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: CATEGORIES.length,
-                                      itemBuilder: (context, i) {
-                                        final c = CATEGORIES[i];
-                                        final active = _activeCategory == c.id;
-
-                                        return GestureDetector(
-                                          onTap: () => setState(
-                                            () => _activeCategory = c.id,
-                                          ),
-                                          child: Container(
-                                            margin: EdgeInsets.only(
-                                              right: _scale(context, 12),
-                                            ),
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: _scale(context, 15),
-                                              vertical: _vScale(context, 12),
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: active
-                                                  ? c.color
-                                                  : Tsurface,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    _scale(context, 15),
-                                                  ),
-                                              border: Border.all(
-                                                color: active
-                                                    ? c.color
-                                                    : Tborder,
-                                                width: 2,
-                                              ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black
-                                                      .withOpacity(
-                                                        active ? 0.20 : 0.10,
-                                                      ),
-                                                  blurRadius: active ? 8 : 6,
-                                                  offset: Offset(
-                                                    0,
-                                                    active ? 4 : 2,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Container(
-                                                  width: _scale(context, 45),
-                                                  height: _scale(context, 45),
-                                                  decoration: BoxDecoration(
-                                                    color: active
-                                                        ? Colors.white
-                                                        : Tripple,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          _scale(context, 22.5),
-                                                        ),
-                                                    boxShadow: active
-                                                        ? [
-                                                            BoxShadow(
-                                                              color: Colors
-                                                                  .black
-                                                                  .withOpacity(
-                                                                    0.20,
-                                                                  ),
-                                                              blurRadius: 4,
-                                                              offset:
-                                                                  const Offset(
-                                                                    0,
-                                                                    2,
-                                                                  ),
-                                                            ),
-                                                          ]
-                                                        : null,
-                                                  ),
-                                                  child: Icon(
-                                                    c.icon,
-                                                    size: _mScale(context, 20),
-                                                    color: active
-                                                        ? c.color
-                                                        : TonBackground,
-                                                  ),
-                                                ),
-                                                SizedBox(
-                                                  height: _vScale(context, 8),
-                                                ),
-                                                Text(
-                                                  c.label,
-                                                  style: TextStyle(
-                                                    fontSize: _mScale(
-                                                      context,
-                                                      12,
-                                                    ),
-                                                    fontWeight: FontWeight.w700,
-                                                    color: active
-                                                        ? Colors.white
-                                                        : TonBackground,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                ),
+                            child: Column(
+                              children: [
+                                _SectionHeader(
+                                  r: r,
+                                  T: T,
+                                  title: "Top Picks for You",
+                                  subtitle:
+                                      "Handpicked options based on students like you",
+                                  rightText: "View all",
+                                  onRightTap: () {},
+                                ),
+                                SizedBox(height: r.vs(12)),
+                                ...topProps.map(
+                                  (p) => _PropertyCard(
+                                    r: r,
+                                    T: T,
+                                    p: p,
+                                    liked: _liked[p.id] ?? false,
+                                    onLike: () => _toggleLike(p.id),
+                                    onView: () {},
+                                    onBook: () {},
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                      ],
 
-                        // ---------- Top Picks ----------
-                        if (topProperties.isNotEmpty)
-                          FadeTransition(
-                            opacity: _cardA,
-                            child: SlideTransition(
-                              position: _cardA.drive(
-                                Tween(
-                                  begin: const Offset(0, 0.15),
-                                  end: Offset.zero,
-                                ).chain(CurveTween(curve: Curves.easeOut)),
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  top: _vScale(context, 25),
-                                ),
-                                child: Column(
-                                  children: [
-                                    _SectionHeader(
-                                      context: context,
-                                      title: "Top Picks for You",
-                                      subtitle:
-                                          "Handpicked options based on students like you",
-                                      rightText: "View all",
-                                      titleColor: TonBackground,
-                                      subtitleColor: Tmuted,
-                                      rightColor: Tprimary,
-                                      onRightTap: () => Navigator.pushNamed(
-                                        context,
-                                        "FeaturedListSeeAllScreen",
-                                      ),
-                                    ),
-                                    for (final p in topProperties)
-                                      _PropertyCard(
-                                        context: context,
-                                        Tprimary: Tprimary,
-                                        TonPrimary: TonPrimary,
-                                        TonBackground: TonBackground,
-                                        Tmuted: Tmuted,
-                                        Televated: Televated,
-                                        Tborder: Tborder,
-                                        item: p,
-                                        liked: _liked[p.id] ?? false,
-                                        onLike: () => _toggleLike(p.id),
-                                        onOpen: () => Navigator.pushNamed(
-                                          context,
-                                          "PropertyDetailScreen",
-                                        ),
-                                        onChat: () => Navigator.pushNamed(
-                                          context,
-                                          "DetailChatScreen",
-                                          arguments: {
-                                            "listing": p,
-                                            "draft":
-                                                "Hi, I'm interested in ${p.title}.",
-                                          },
-                                        ),
-                                        scale: _scale,
-                                        vScale: _vScale,
-                                        mScale: _mScale,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        // ---------- Special Offers ----------
-                        FadeTransition(
-                          opacity: _posterA,
-                          child: SlideTransition(
-                            position: _posterA.drive(
-                              Tween(
-                                begin: const Offset(0, 0.15),
+                      // -------- Special Offers (✅ overflow fixed) --------
+                      SizedBox(height: sectionGap),
+                      FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: _posterCtrl,
+                          curve: Curves.easeOut,
+                        ),
+                        child: SlideTransition(
+                          position:
+                              Tween<Offset>(
+                                begin: const Offset(0, 0.10),
                                 end: Offset.zero,
-                              ).chain(CurveTween(curve: Curves.easeOut)),
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.only(
-                                top: _vScale(context, 25),
+                              ).animate(
+                                CurvedAnimation(
+                                  parent: _posterCtrl,
+                                  curve: Curves.easeOut,
+                                ),
                               ),
-                              child: Column(
-                                children: [
-                                  _SectionHeader(
-                                    context: context,
-                                    title: "Special Offers",
-                                    subtitle: "Exclusive deals for students",
-                                    rightText: "View all",
-                                    titleColor: TonBackground,
-                                    subtitleColor: Tmuted,
-                                    rightColor: Tprimary,
-                                    onRightTap: () {},
-                                  ),
-                                  SizedBox(height: _vScale(context, 5)),
-                                  SizedBox(
-                                    height:
-                                        _vScale(context, 200) +
-                                        _vScale(context, 40),
+                          child: Column(
+                            children: [
+                              _SectionHeader(
+                                r: r,
+                                T: T,
+                                title: "Special Offers",
+                                subtitle: "Exclusive deals for students",
+                                rightText: "View all",
+                                onRightTap: () {
+                                  // ✅ GoRouter navigation
+                                  context.pushNamed('offers');
+                                },
+                              ),
+                              SizedBox(height: r.vs(12)),
+                              Builder(
+                                builder: (_) {
+                                  final offerH = math.min(
+                                    r.vs(230),
+                                    mq.size.width * 0.62,
+                                  );
+
+                                  return SizedBox(
+                                    height: offerH + r.vs(34),
                                     child: Column(
                                       children: [
                                         SizedBox(
-                                          height: _vScale(context, 200),
+                                          height: offerH,
                                           child: PageView.builder(
-                                            controller: _posterCtrl,
+                                            controller: _posterPC,
                                             itemCount: POSTERS.length,
                                             itemBuilder: (context, index) {
                                               final item = POSTERS[index];
-                                              final t =
-                                                  (1 -
-                                                          (_posterPage - index)
-                                                              .abs())
-                                                      .clamp(0.0, 1.0);
+                                              final delta =
+                                                  (index - _posterPage);
                                               final scale =
-                                                  0.95 + (1 - 0.95) * t;
-
-                                              final offerText =
-                                                  item.discount ??
-                                                  item.reward ??
-                                                  item.offer ??
-                                                  "";
+                                                  (1 - (delta.abs() * 0.05))
+                                                      .clamp(0.95, 1.0);
 
                                               return Transform.scale(
                                                 scale: scale,
                                                 child: Padding(
                                                   padding: EdgeInsets.only(
-                                                    right: _scale(context, 20),
+                                                    left: index == 0
+                                                        ? r.s(16)
+                                                        : r.s(8),
+                                                    right: r.s(8),
                                                   ),
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          _scale(context, 20),
-                                                        ),
-                                                    child: Stack(
-                                                      fit: StackFit.expand,
-                                                      children: [
-                                                        Container(
-                                                          decoration: BoxDecoration(
-                                                            gradient: LinearGradient(
-                                                              colors:
-                                                                  item.gradient,
-                                                              begin: Alignment
-                                                                  .topLeft,
-                                                              end: Alignment
-                                                                  .bottomRight,
-                                                            ),
-                                                          ),
-                                                        ),
 
-                                                        // pattern circles (opacity 0.1 like RN)
-                                                        Opacity(
-                                                          opacity: 0.10,
-                                                          child: Stack(
-                                                            children: [
-                                                              Positioned(
-                                                                top: -50,
-                                                                right: -50,
-                                                                child: Container(
-                                                                  width: _scale(
-                                                                    context,
-                                                                    150,
-                                                                  ),
-                                                                  height:
-                                                                      _scale(
-                                                                        context,
-                                                                        150,
-                                                                      ),
-                                                                  decoration: BoxDecoration(
-                                                                    color: Colors
-                                                                        .white,
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          _scale(
-                                                                            context,
-                                                                            75,
-                                                                          ),
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              Positioned(
-                                                                bottom: -30,
-                                                                left: -30,
-                                                                child: Container(
-                                                                  width: _scale(
-                                                                    context,
-                                                                    100,
-                                                                  ),
-                                                                  height:
-                                                                      _scale(
-                                                                        context,
-                                                                        100,
-                                                                      ),
-                                                                  decoration: BoxDecoration(
-                                                                    color: Colors
-                                                                        .white,
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          _scale(
-                                                                            context,
-                                                                            50,
-                                                                          ),
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-
-                                                        // bg image (opacity 0.15 like RN)
-                                                        Opacity(
-                                                          opacity: 0.15,
-                                                          child: Image.asset(
-                                                            item.asset,
-                                                            fit: BoxFit.cover,
-                                                          ),
-                                                        ),
-
-                                                        Padding(
-                                                          padding:
-                                                              EdgeInsets.all(
-                                                                _scale(
-                                                                  context,
-                                                                  20,
-                                                                ),
-                                                              ),
-                                                          child: Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              // offer badge
-                                                              Container(
-                                                                padding: EdgeInsets.symmetric(
-                                                                  horizontal:
-                                                                      _scale(
-                                                                        context,
-                                                                        12,
-                                                                      ),
-                                                                  vertical:
-                                                                      _vScale(
-                                                                        context,
-                                                                        6,
-                                                                      ),
-                                                                ),
-                                                                decoration: BoxDecoration(
-                                                                  color: Colors
-                                                                      .white
-                                                                      .withOpacity(
-                                                                        0.25,
-                                                                      ),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        _scale(
-                                                                          context,
-                                                                          20,
-                                                                        ),
-                                                                      ),
-                                                                  border: Border.all(
-                                                                    color: Colors
-                                                                        .white
-                                                                        .withOpacity(
-                                                                          0.30,
-                                                                        ),
-                                                                  ),
-                                                                ),
-                                                                child: Row(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  children: [
-                                                                    Icon(
-                                                                      item.icon,
-                                                                      size: _mScale(
-                                                                        context,
-                                                                        14,
-                                                                      ),
-                                                                      color: Colors
-                                                                          .white,
-                                                                    ),
-                                                                    SizedBox(
-                                                                      width: _scale(
-                                                                        context,
-                                                                        6,
-                                                                      ),
-                                                                    ),
-                                                                    Text(
-                                                                      offerText,
-                                                                      style: TextStyle(
-                                                                        fontSize: _mScale(
-                                                                          context,
-                                                                          12,
-                                                                        ),
-                                                                        fontWeight:
-                                                                            FontWeight.w800,
-                                                                        color: Colors
-                                                                            .white,
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-
-                                                              // timer badge
-                                                              Align(
-                                                                alignment:
-                                                                    Alignment
-                                                                        .topRight,
-                                                                child: Container(
-                                                                  padding: EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        _scale(
-                                                                          context,
-                                                                          10,
-                                                                        ),
-                                                                    vertical:
-                                                                        _vScale(
-                                                                          context,
-                                                                          4,
-                                                                        ),
-                                                                  ),
-                                                                  decoration: BoxDecoration(
-                                                                    color: Colors
-                                                                        .black
-                                                                        .withOpacity(
-                                                                          0.30,
-                                                                        ),
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          _scale(
-                                                                            context,
-                                                                            12,
-                                                                          ),
-                                                                        ),
-                                                                  ),
-                                                                  child: Row(
-                                                                    mainAxisSize:
-                                                                        MainAxisSize
-                                                                            .min,
-                                                                    children: [
-                                                                      Icon(
-                                                                        MdiIcons
-                                                                            .clockOutline,
-                                                                        size: _mScale(
-                                                                          context,
-                                                                          12,
-                                                                        ),
-                                                                        color: Colors
-                                                                            .white,
-                                                                      ),
-                                                                      SizedBox(
-                                                                        width: _scale(
-                                                                          context,
-                                                                          4,
-                                                                        ),
-                                                                      ),
-                                                                      Text(
-                                                                        item.timeLeft,
-                                                                        style: TextStyle(
-                                                                          fontSize: _mScale(
-                                                                            context,
-                                                                            10,
-                                                                          ),
-                                                                          fontWeight:
-                                                                              FontWeight.w700,
-                                                                          color:
-                                                                              Colors.white,
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                ),
-                                                              ),
-
-                                                              const Spacer(),
-
-                                                              Text(
-                                                                item.title,
-                                                                style: TextStyle(
-                                                                  fontSize:
-                                                                      _mScale(
-                                                                        context,
-                                                                        22,
-                                                                      ),
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w900,
-                                                                  color: Colors
-                                                                      .white,
-                                                                  shadows: [
-                                                                    Shadow(
-                                                                      color: Colors
-                                                                          .black
-                                                                          .withOpacity(
-                                                                            0.30,
-                                                                          ),
-                                                                      blurRadius:
-                                                                          3,
-                                                                      offset:
-                                                                          const Offset(
-                                                                            1,
-                                                                            1,
-                                                                          ),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                              SizedBox(
-                                                                height: _vScale(
-                                                                  context,
-                                                                  5,
-                                                                ),
-                                                              ),
-                                                              Text(
-                                                                item.description,
-                                                                style: TextStyle(
-                                                                  fontSize:
-                                                                      _mScale(
-                                                                        context,
-                                                                        14,
-                                                                      ),
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500,
-                                                                  color: Colors
-                                                                      .white
-                                                                      .withOpacity(
-                                                                        0.95,
-                                                                      ),
-                                                                ),
-                                                              ),
-                                                              SizedBox(
-                                                                height: _vScale(
-                                                                  context,
-                                                                  20,
-                                                                ),
-                                                              ),
-
-                                                              // coupon row
-                                                              Row(
-                                                                children: [
-                                                                  Expanded(
-                                                                    child: Container(
-                                                                      padding: EdgeInsets.symmetric(
-                                                                        horizontal: _scale(
-                                                                          context,
-                                                                          15,
-                                                                        ),
-                                                                        vertical: _vScale(
-                                                                          context,
-                                                                          10,
-                                                                        ),
-                                                                      ),
-                                                                      decoration: BoxDecoration(
-                                                                        color: Colors
-                                                                            .white
-                                                                            .withOpacity(
-                                                                              0.15,
-                                                                            ),
-                                                                        borderRadius: BorderRadius.circular(
-                                                                          _scale(
-                                                                            context,
-                                                                            12,
-                                                                          ),
-                                                                        ),
-                                                                        border: Border.all(
-                                                                          color: Colors.white.withOpacity(
-                                                                            0.25,
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                      child: Row(
-                                                                        children: [
-                                                                          Icon(
-                                                                            MdiIcons.tagOutline,
-                                                                            size: _mScale(
-                                                                              context,
-                                                                              16,
-                                                                            ),
-                                                                            color:
-                                                                                Colors.white,
-                                                                          ),
-                                                                          SizedBox(
-                                                                            width: _scale(
-                                                                              context,
-                                                                              10,
-                                                                            ),
-                                                                          ),
-                                                                          Text(
-                                                                            item.code,
-                                                                            style: TextStyle(
-                                                                              fontSize: _mScale(
-                                                                                context,
-                                                                                16,
-                                                                              ),
-                                                                              fontWeight: FontWeight.w800,
-                                                                              letterSpacing: 1,
-                                                                              color: Colors.white,
-                                                                            ),
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                  SizedBox(
-                                                                    width: _scale(
-                                                                      context,
-                                                                      10,
-                                                                    ),
-                                                                  ),
-                                                                  InkWell(
-                                                                    onTap: () =>
-                                                                        _copyCouponCode(
-                                                                          item.code,
-                                                                        ),
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          _scale(
-                                                                            context,
-                                                                            12,
-                                                                          ),
-                                                                        ),
-                                                                    child: Container(
-                                                                      padding: EdgeInsets.symmetric(
-                                                                        horizontal: _scale(
-                                                                          context,
-                                                                          15,
-                                                                        ),
-                                                                        vertical: _vScale(
-                                                                          context,
-                                                                          10,
-                                                                        ),
-                                                                      ),
-                                                                      decoration: BoxDecoration(
-                                                                        color:
-                                                                            (_copiedCode ==
-                                                                                item.code)
-                                                                            ? const Color.fromRGBO(
-                                                                                76,
-                                                                                217,
-                                                                                100,
-                                                                                0.80,
-                                                                              )
-                                                                            : Colors.white.withOpacity(
-                                                                                0.25,
-                                                                              ),
-                                                                        borderRadius: BorderRadius.circular(
-                                                                          _scale(
-                                                                            context,
-                                                                            12,
-                                                                          ),
-                                                                        ),
-                                                                        border: Border.all(
-                                                                          color: Colors.white.withOpacity(
-                                                                            0.30,
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                      child: Row(
-                                                                        children: [
-                                                                          Icon(
-                                                                            _copiedCode ==
-                                                                                    item.code
-                                                                                ? MdiIcons.check
-                                                                                : MdiIcons.contentCopy,
-                                                                            size: _mScale(
-                                                                              context,
-                                                                              14,
-                                                                            ),
-                                                                            color:
-                                                                                Colors.white,
-                                                                          ),
-                                                                          SizedBox(
-                                                                            width: _scale(
-                                                                              context,
-                                                                              6,
-                                                                            ),
-                                                                          ),
-                                                                          Text(
-                                                                            _copiedCode ==
-                                                                                    item.code
-                                                                                ? "Copied!"
-                                                                                : "Copy",
-                                                                            style: TextStyle(
-                                                                              fontSize: _mScale(
-                                                                                context,
-                                                                                12,
-                                                                              ),
-                                                                              fontWeight: FontWeight.w700,
-                                                                              color: Colors.white,
-                                                                            ),
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-
-                                                              SizedBox(
-                                                                height: _vScale(
-                                                                  context,
-                                                                  16,
-                                                                ),
-                                                              ),
-
-                                                              // CTA button (white)
-                                                              Center(
-                                                                child: InkWell(
-                                                                  onTap: () =>
-                                                                      Navigator.pushNamed(
-                                                                        context,
-                                                                        "OffersScreen",
-                                                                      ),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        _scale(
-                                                                          context,
-                                                                          15,
-                                                                        ),
-                                                                      ),
-                                                                  child: Container(
-                                                                    padding: EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          _scale(
-                                                                            context,
-                                                                            16,
-                                                                          ),
-                                                                      vertical:
-                                                                          _vScale(
-                                                                            context,
-                                                                            5,
-                                                                          ),
-                                                                    ),
-                                                                    decoration: BoxDecoration(
-                                                                      color: Colors
-                                                                          .white,
-                                                                      borderRadius: BorderRadius.circular(
-                                                                        _scale(
-                                                                          context,
-                                                                          15,
-                                                                        ),
-                                                                      ),
-                                                                    ),
-                                                                    child: Row(
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        Text(
-                                                                          "Claim Offer",
-                                                                          style: TextStyle(
-                                                                            fontSize: _mScale(
-                                                                              context,
-                                                                              15,
-                                                                            ),
-                                                                            fontWeight:
-                                                                                FontWeight.w900,
-                                                                            color:
-                                                                                Colors.black,
-                                                                          ),
-                                                                        ),
-                                                                        SizedBox(
-                                                                          width: _scale(
-                                                                            context,
-                                                                            8,
-                                                                          ),
-                                                                        ),
-                                                                        Icon(
-                                                                          MdiIcons
-                                                                              .arrowRight,
-                                                                          size: _mScale(
-                                                                            context,
-                                                                            16,
-                                                                          ),
-                                                                          color:
-                                                                              Colors.white,
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-
-                                                        // decorative circle + triangle (same feel)
-                                                        Positioned(
-                                                          bottom: -30,
-                                                          right: -30,
-                                                          child: Container(
-                                                            width: _scale(
-                                                              context,
-                                                              100,
-                                                            ),
-                                                            height: _scale(
-                                                              context,
-                                                              100,
-                                                            ),
-                                                            decoration: BoxDecoration(
-                                                              color: Colors
-                                                                  .white
-                                                                  .withOpacity(
-                                                                    0.10,
-                                                                  ),
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    _scale(
-                                                                      context,
-                                                                      50,
-                                                                    ),
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Positioned(
-                                                          top: -20,
-                                                          left: -20,
-                                                          child: Transform.rotate(
-                                                            angle: -math.pi / 4,
-                                                            child: Container(
-                                                              width: _scale(
-                                                                context,
-                                                                60,
-                                                              ),
-                                                              height: _scale(
-                                                                context,
-                                                                60,
-                                                              ),
-                                                              color: Colors
-                                                                  .white
-                                                                  .withOpacity(
-                                                                    0.10,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
+                                                  child: _PosterCard(
+                                                    r: r,
+                                                    item: item,
+                                                    copied:
+                                                        _copiedCode ==
+                                                        item.code,
+                                                    onCopy: () =>
+                                                        _copyCoupon(item.code),
+                                                    onClaim: () {},
                                                   ),
                                                 ),
                                               );
                                             },
                                           ),
                                         ),
-                                        SizedBox(height: _vScale(context, 15)),
-                                        _dotsBar(
-                                          context: context,
-                                          count: POSTERS.length,
+                                        SizedBox(height: r.vs(12)),
+                                        _PosterDots(
+                                          r: r,
+                                          T: T,
                                           page: _posterPage,
-                                          activeColor: Tprimary,
-                                          height: 6,
-                                          minW: 6,
-                                          maxW: 16,
                                         ),
                                       ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // -------- Sponsored Space --------
+                      SizedBox(height: sectionGap),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: r.s(20)),
+                        child: Column(
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Sponsored Space",
+                                    style: TextStyle(
+                                      fontSize: r.ms(20),
+                                      fontWeight: FontWeight.w800,
+                                      color: T.onBackground,
+                                    ),
+                                  ),
+                                  SizedBox(height: r.vs(2)),
+                                  Text(
+                                    "Perfect spot for partner brands & services",
+                                    style: TextStyle(
+                                      fontSize: r.ms(12),
+                                      color: T.muted,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        ),
-
-                        // ---------- Sponsored Space ----------
-                        Padding(
-                          padding: EdgeInsets.only(top: _vScale(context, 25)),
-                          child: Column(
-                            children: [
-                              _SectionHeader(
-                                context: context,
-                                title: "Sponsored Space",
-                                subtitle:
-                                    "Perfect spot for partner brands & services",
-                                titleColor: TonBackground,
-                                subtitleColor: Tmuted,
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: _scale(context, 20),
+                            SizedBox(height: r.vs(15)),
+                            Container(
+                              padding: EdgeInsets.all(r.s(18)),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(r.s(20)),
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF232526),
+                                    Color(0xFF414345),
+                                  ],
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    _scale(context, 20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.18),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 6),
                                   ),
-                                  child: Container(
-                                    padding: EdgeInsets.all(
-                                      _scale(context, 18),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: r.s(10),
+                                      vertical: r.vs(4),
                                     ),
-                                    decoration: const BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Color(0xFF232526),
-                                          Color(0xFF414345),
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.16),
+                                      borderRadius: BorderRadius.circular(
+                                        r.s(20),
+                                      ),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.35),
+                                        width: 1,
                                       ),
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: _scale(context, 10),
-                                            vertical: _vScale(context, 4),
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(
-                                              0.16,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              _scale(context, 20),
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.white.withOpacity(
-                                                0.35,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                MdiIcons.bullhornOutline,
-                                                size: _mScale(context, 14),
-                                                color: Colors.white,
-                                              ),
-                                              SizedBox(
-                                                width: _scale(context, 6),
-                                              ),
-                                              Text(
-                                                "PROMOTED SPACE",
-                                                style: TextStyle(
-                                                  fontSize: _mScale(
-                                                    context,
-                                                    10,
-                                                  ),
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing: 0.5,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                        Icon(
+                                          MdiIcons.bullhornOutline,
+                                          size: r.ms(14),
+                                          color: Colors.white,
                                         ),
-                                        SizedBox(height: _vScale(context, 12)),
+                                        SizedBox(width: r.s(6)),
                                         Text(
-                                          "Your Brand, In Front of Thousands of Students",
+                                          "PROMOTED SPACE",
                                           style: TextStyle(
-                                            fontSize: _mScale(context, 18),
-                                            fontWeight: FontWeight.w900,
+                                            fontSize: r.ms(10),
+                                            fontWeight: FontWeight.w800,
                                             color: Colors.white,
+                                            letterSpacing: 0.5,
                                           ),
-                                        ),
-                                        SizedBox(height: _vScale(context, 8)),
-                                        Text(
-                                          "Promote packers & movers, furniture rental, internet plans, coaching classes or any student-focused service right here.",
-                                          style: TextStyle(
-                                            fontSize: _mScale(context, 13),
-                                            height: 1.3,
-                                            color: Colors.white.withOpacity(
-                                              0.90,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(height: _vScale(context, 16)),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                "Want to advertise here?",
-                                                style: TextStyle(
-                                                  fontSize: _mScale(
-                                                    context,
-                                                    12,
-                                                  ),
-                                                  color: Colors.white
-                                                      .withOpacity(0.80),
-                                                ),
-                                              ),
-                                            ),
-                                            InkWell(
-                                              onTap: () => Navigator.pushNamed(
-                                                context,
-                                                "AdvertiseWithUsScreen",
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    _scale(context, 20),
-                                                  ),
-                                              child: Container(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: _scale(
-                                                    context,
-                                                    14,
-                                                  ),
-                                                  vertical: _vScale(context, 8),
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        _scale(context, 20),
-                                                      ),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Text(
-                                                      "Contact Sales",
-                                                      style: TextStyle(
-                                                        fontSize: _mScale(
-                                                          context,
-                                                          12,
-                                                        ),
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        color: Colors.black,
-                                                      ),
-                                                    ),
-                                                    SizedBox(
-                                                      width: _scale(context, 6),
-                                                    ),
-                                                    Icon(
-                                                      MdiIcons.arrowRight,
-                                                      size: _mScale(
-                                                        context,
-                                                        14,
-                                                      ),
-                                                      color: Colors.black,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
                                         ),
                                       ],
                                     ),
                                   ),
-                                ),
+                                  SizedBox(height: r.vs(12)),
+                                  Text(
+                                    "Your Brand, In Front of Thousands of Students",
+                                    style: TextStyle(
+                                      fontSize: r.ms(18),
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(height: r.vs(8)),
+                                  Text(
+                                    "Promote packers & movers, furniture rental, internet plans, coaching classes or any student-focused service right here.",
+                                    style: TextStyle(
+                                      fontSize: r.ms(13),
+                                      height: 1.35,
+                                      color: Colors.white.withOpacity(0.9),
+                                    ),
+                                  ),
+                                  SizedBox(height: r.vs(16)),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          "Want to advertise here?",
+                                          style: TextStyle(
+                                            fontSize: r.ms(12),
+                                            color: Colors.white.withOpacity(
+                                              0.8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () {},
+                                        child: Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: r.s(14),
+                                            vertical: r.vs(8),
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              r.s(20),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                "Contact Sales",
+                                                style: TextStyle(
+                                                  fontSize: r.ms(12),
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.black,
+                                                ),
+                                              ),
+                                              SizedBox(width: r.s(6)),
+                                              Icon(
+                                                MdiIcons.arrowRight,
+                                                size: r.ms(14),
+                                                color: Colors.black,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
+                      ),
 
-                        // ---------- Remaining properties ----------
-                        if (remainingProperties.isNotEmpty)
-                          Padding(
-                            padding: EdgeInsets.only(top: _vScale(context, 25)),
+                      // -------- Remaining Properties --------
+                      if (remainingProps.isNotEmpty) ...[
+                        SizedBox(height: sectionGap),
+                        FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: _cardCtrl,
+                            curve: Curves.easeOut,
+                          ),
+                          child: SlideTransition(
+                            position:
+                                Tween<Offset>(
+                                  begin: const Offset(0, 0.10),
+                                  end: Offset.zero,
+                                ).animate(
+                                  CurvedAnimation(
+                                    parent: _cardCtrl,
+                                    curve: Curves.easeOut,
+                                  ),
+                                ),
                             child: Column(
                               children: [
                                 _SectionHeader(
-                                  context: context,
+                                  r: r,
+                                  T: T,
                                   title: "More Properties Near You",
                                   subtitle: "Explore more living options",
                                   rightText: "View all",
-                                  titleColor: TonBackground,
-                                  subtitleColor: Tmuted,
-                                  rightColor: Tprimary,
-                                  onRightTap: () => Navigator.pushNamed(
-                                    context,
-                                    "FeaturedListSeeAllScreen",
-                                  ),
+                                  onRightTap: () {},
                                 ),
-                                for (final p in remainingProperties)
-                                  _PropertyCard(
-                                    context: context,
-                                    Tprimary: Tprimary,
-                                    TonPrimary: TonPrimary,
-                                    TonBackground: TonBackground,
-                                    Tmuted: Tmuted,
-                                    Televated: Televated,
-                                    Tborder: Tborder,
-                                    item: p,
+                                SizedBox(height: r.vs(12)),
+                                ...remainingProps.map(
+                                  (p) => _PropertyCard(
+                                    r: r,
+                                    T: T,
+                                    p: p,
                                     liked: _liked[p.id] ?? false,
                                     onLike: () => _toggleLike(p.id),
-                                    onOpen: () => Navigator.pushNamed(
-                                      context,
-                                      "PropertyDetailScreen",
-                                    ),
-                                    onChat: () => Navigator.pushNamed(
-                                      context,
-                                      "DetailChatScreen",
-                                      arguments: {
-                                        "listing": p,
-                                        "draft":
-                                            "Hi, I'm interested in ${p.title}.",
-                                      },
-                                    ),
-                                    scale: _scale,
-                                    vScale: _vScale,
-                                    mScale: _mScale,
+                                    onView: () {},
+                                    onBook: () {},
                                   ),
+                                ),
                               ],
                             ),
                           ),
-
-                        SizedBox(height: _vScale(context, _tabBarSpace)),
+                        ),
                       ],
-                    ),
+
+                      SizedBox(height: tabBarSpace),
+                    ],
                   ),
                 ),
               ),
@@ -2092,49 +1212,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-// -------------------- SECTION HEADER --------------------
+/* -------------------- Widgets -------------------- */
+
 class _SectionHeader extends StatelessWidget {
-  final BuildContext context;
+  final R r;
+  final Toks T;
   final String title;
   final String? subtitle;
   final String? rightText;
-  final Color titleColor;
-  final Color? subtitleColor;
-  final Color? rightColor;
   final VoidCallback? onRightTap;
 
   const _SectionHeader({
-    required this.context,
+    required this.r,
+    required this.T,
     required this.title,
     this.subtitle,
     this.rightText,
-    required this.titleColor,
-    this.subtitleColor,
-    this.rightColor,
     this.onRightTap,
   });
 
-  double _scale(BuildContext context, double v) {
-    final w = MediaQuery.of(context).size.width;
-    return (w / 375.0) * v;
-  }
-
-  double _vScale(BuildContext context, double v) {
-    final h = MediaQuery.of(context).size.height;
-    return (h / 667.0) * v;
-  }
-
-  double _mScale(BuildContext context, double v, [double factor = 0.5]) {
-    final s = _scale(context, v);
-    return v + (s - v) * factor;
-  }
-
   @override
-  Widget build(BuildContext _) {
+  Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: _scale(context, 20)),
+      padding: EdgeInsets.symmetric(horizontal: r.s(20)),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: Column(
@@ -2143,33 +1245,30 @@ class _SectionHeader extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: _mScale(context, 20),
+                    fontSize: r.ms(20),
                     fontWeight: FontWeight.w800,
-                    color: titleColor,
+                    color: T.onBackground,
                   ),
                 ),
                 if (subtitle != null) ...[
-                  SizedBox(height: _vScale(context, 2)),
+                  SizedBox(height: r.vs(2)),
                   Text(
                     subtitle!,
-                    style: TextStyle(
-                      fontSize: _mScale(context, 12),
-                      color: subtitleColor ?? titleColor.withOpacity(0.7),
-                    ),
+                    style: TextStyle(fontSize: r.ms(12), color: T.muted),
                   ),
                 ],
               ],
             ),
           ),
           if (rightText != null)
-            InkWell(
+            GestureDetector(
               onTap: onRightTap,
               child: Text(
                 rightText!,
                 style: TextStyle(
-                  fontSize: _mScale(context, 14),
+                  fontSize: r.ms(14),
                   fontWeight: FontWeight.w700,
-                  color: rightColor ?? titleColor,
+                  color: T.primary,
                 ),
               ),
             ),
@@ -2179,405 +1278,855 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// -------------------- PROPERTY CARD --------------------
-class _PropertyCard extends StatelessWidget {
-  final BuildContext context;
-  final Color Tprimary;
-  final Color TonPrimary;
-  final Color TonBackground;
-  final Color Tmuted;
-  final Color Televated;
-  final Color Tborder;
+class _BannerCarousel extends StatelessWidget {
+  final R r;
+  final Toks T;
+  final double page;
+  final PageController controller;
 
-  final PropertyItem item;
-  final bool liked;
-  final VoidCallback onLike;
-  final VoidCallback onOpen;
-  final VoidCallback onChat;
-
-  final double Function(BuildContext, double) scale;
-  final double Function(BuildContext, double) vScale;
-  final double Function(BuildContext, double, [double]) mScale;
-
-  const _PropertyCard({
-    required this.context,
-    required this.Tprimary,
-    required this.TonPrimary,
-    required this.TonBackground,
-    required this.Tmuted,
-    required this.Televated,
-    required this.Tborder,
-    required this.item,
-    required this.liked,
-    required this.onLike,
-    required this.onOpen,
-    required this.onChat,
-    required this.scale,
-    required this.vScale,
-    required this.mScale,
+  const _BannerCarousel({
+    required this.r,
+    required this.T,
+    required this.page,
+    required this.controller,
   });
 
   @override
-  Widget build(BuildContext _) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: scale(context, 20),
-      ).copyWith(bottom: vScale(context, 20)),
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(scale(context, 20)),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Televated,
-            borderRadius: BorderRadius.circular(scale(context, 20)),
-            border: Border.all(color: Tborder, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.10),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              // image section
-              SizedBox(
-                height: vScale(context, 180),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.asset(item.asset, fit: BoxFit.cover),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        height: vScale(context, 180) * 0.50,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.transparent,
-                              Color.fromRGBO(0, 0, 0, 0.70),
+  Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+
+    // ✅ responsive banner height (overflow safe)
+    final bannerH = math.min(r.vs(190), w * 0.46);
+
+    return Column(
+      children: [
+        SizedBox(
+          height: bannerH,
+          child: PageView.builder(
+            controller: controller,
+            itemCount: BANNERS.length,
+            itemBuilder: (context, index) {
+              final item = BANNERS[index];
+              final delta = (index - page);
+              final scale = (1 - (delta.abs() * 0.10)).clamp(0.90, 1.0);
+
+              return Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: w - r.s(40),
+                  margin: EdgeInsets.symmetric(horizontal: r.s(20)),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(r.s(20)),
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: item.gradient,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(r.s(20)),
+                    child: LayoutBuilder(
+                      builder: (context, c) {
+                        final imgSize = math.min(
+                          r.s(120),
+                          c.maxHeight - r.vs(32),
+                        );
+
+                        return Padding(
+                          padding: EdgeInsets.all(r.s(16)),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: r.s(10),
+                                        vertical: r.vs(4),
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.20),
+                                        borderRadius: BorderRadius.circular(
+                                          r.s(20),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            MdiIcons.lightningBolt,
+                                            size: r.ms(14),
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: r.s(5)),
+                                          Text(
+                                            "LIMITED OFFER",
+                                            style: TextStyle(
+                                              fontSize: r.ms(10),
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(height: r.vs(8)),
+                                    Text(
+                                      item.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: r.ms(20),
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    SizedBox(height: r.vs(4)),
+                                    Text(
+                                      item.sub,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.9),
+                                        fontSize: r.ms(13),
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: r.s(14),
+                                          vertical: r.vs(8),
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.20),
+                                          borderRadius: BorderRadius.circular(
+                                            r.s(12),
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.white.withOpacity(
+                                              0.30,
+                                            ),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              "Explore Now",
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: r.ms(13),
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                            SizedBox(width: r.s(6)),
+                                            Icon(
+                                              MdiIcons.arrowRight,
+                                              size: r.ms(16),
+                                              color: Colors.white,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: r.s(10)),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(r.s(15)),
+                                child: Image.asset(
+                                  item.asset,
+                                  width: imgSize,
+                                  height: imgSize,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
-
-                    // price tag
-                    Positioned(
-                      top: scale(context, 15),
-                      left: scale(context, 15),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: scale(context, 12),
-                          vertical: vScale(context, 6),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(
-                            scale(context, 20),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.20),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          item.price,
-                          style: TextStyle(
-                            fontSize: mScale(context, 14),
-                            fontWeight: FontWeight.w800,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // like
-                    Positioned(
-                      top: scale(context, 15),
-                      right: scale(context, 15),
-                      child: InkWell(
-                        onTap: onLike,
-                        borderRadius: BorderRadius.circular(scale(context, 20)),
-                        child: Container(
-                          width: scale(context, 40),
-                          height: scale(context, 40),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.30),
-                            borderRadius: BorderRadius.circular(
-                              scale(context, 20),
-                            ),
-                          ),
-                          child: Icon(
-                            liked ? MdiIcons.heart : MdiIcons.heartOutline,
-                            size: mScale(context, 22),
-                            color: liked
-                                ? const Color(0xFFFF4757)
-                                : Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // rating
-                    Positioned(
-                      bottom: scale(context, 15),
-                      right: scale(context, 15),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: scale(context, 10),
-                          vertical: vScale(context, 4),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.60),
-                          borderRadius: BorderRadius.circular(
-                            scale(context, 20),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              MdiIcons.star,
-                              size: mScale(context, 12),
-                              color: const Color(0xFFFFD700),
-                            ),
-                            SizedBox(width: scale(context, 4)),
-                            Text(
-                              item.rating.toStringAsFixed(1),
-                              style: TextStyle(
-                                fontSize: mScale(context, 12),
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              );
+            },
+          ),
+        ),
+        SizedBox(height: r.vs(12)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(BANNERS.length, (i) {
+            final t = (1 - (page - i).abs()).clamp(0.0, 1.0);
+            final dotW = lerpDouble(8, 20, t)!;
+            final dotO = lerpDouble(0.3, 1.0, t)!;
 
-              // details
-              Padding(
-                padding: EdgeInsets.all(scale(context, 15)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: TextStyle(
-                        fontSize: mScale(context, 18),
-                        fontWeight: FontWeight.w800,
-                        color: TonBackground,
-                      ),
-                    ),
-                    SizedBox(height: vScale(context, 5)),
-                    Row(
-                      children: [
-                        Icon(
-                          MdiIcons.mapMarkerOutline,
-                          size: mScale(context, 12),
-                          color: Tmuted,
-                        ),
-                        SizedBox(width: scale(context, 5)),
-                        Expanded(
-                          child: Text(
-                            "${item.area} • ${item.distance}",
-                            style: TextStyle(
-                              fontSize: mScale(context, 12),
-                              color: Tmuted,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              margin: EdgeInsets.symmetric(horizontal: r.s(4)),
+              width: dotW,
+              height: r.s(8),
+              decoration: BoxDecoration(
+                color: T.primary.withOpacity(dotO),
+                borderRadius: BorderRadius.circular(r.s(4)),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+class _PosterDots extends StatelessWidget {
+  final R r;
+  final Toks T;
+  final double page;
+  const _PosterDots({required this.r, required this.T, required this.page});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(POSTERS.length, (i) {
+        final t = (1 - (page - i).abs()).clamp(0.0, 1.0);
+        final w = lerpDouble(6, 16, t)!;
+        return Container(
+          margin: EdgeInsets.symmetric(horizontal: r.s(3)),
+          width: w,
+          height: r.s(6),
+          decoration: BoxDecoration(
+            color: T.primary,
+            borderRadius: BorderRadius.circular(r.s(3)),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _PosterCard extends StatelessWidget {
+  final R r;
+  final PosterItem item;
+  final bool copied;
+  final VoidCallback onCopy;
+  final VoidCallback onClaim;
+
+  const _PosterCard({
+    required this.r,
+    required this.item,
+    required this.copied,
+    required this.onCopy,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(r.s(20)),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          // ✅ responsive padding/gaps
+          final pad = math.min(r.s(18), c.maxHeight * 0.10);
+          final gap = math.max(r.vs(8), c.maxHeight * 0.04);
+
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: item.gradient,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Opacity(
+                  opacity: 0.10,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: -50,
+                        right: -50,
+                        child: Container(
+                          width: 150,
+                          height: 150,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                      ],
-                    ),
-
-                    SizedBox(height: vScale(context, 10)),
-                    Wrap(
-                      spacing: scale(context, 8),
-                      runSpacing: vScale(context, 5),
-                      children: item.features
-                          .map(
-                            (f) => Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: scale(context, 10),
-                                vertical: vScale(context, 5),
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(
-                                  scale(context, 15),
-                                ),
-                              ),
-                              child: Text(
-                                f,
-                                style: TextStyle(
-                                  fontSize: mScale(context, 11),
-                                  fontWeight: FontWeight.w600,
-                                  color: TonBackground,
-                                ),
+                      ),
+                      Positioned(
+                        bottom: -30,
+                        left: -30,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0.15,
+                    child: Image.asset(item.bgAsset, fit: BoxFit.cover),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.all(pad),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: r.s(12),
+                              vertical: r.vs(6),
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(r.s(20)),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.30),
+                                width: 1,
                               ),
                             ),
-                          )
-                          .toList(),
-                    ),
-
-                    SizedBox(height: vScale(context, 15)),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: onOpen,
-                            borderRadius: BorderRadius.circular(
-                              scale(context, 12),
-                            ),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                vertical: vScale(context, 10),
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(
-                                  scale(context, 12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  item.icon,
+                                  size: r.ms(14),
+                                  color: Colors.white,
                                 ),
-                                border: Border.all(color: Tborder, width: 1),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  "View Details",
+                                SizedBox(width: r.s(6)),
+                                Text(
+                                  item.badgeText,
                                   style: TextStyle(
-                                    fontSize: mScale(context, 14),
-                                    fontWeight: FontWeight.w700,
-                                    color: TonBackground,
+                                    color: Colors.white,
+                                    fontSize: r.ms(12),
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
-                        ),
-                        SizedBox(width: scale(context, 10)),
-                        Expanded(
-                          child: InkWell(
-                            onTap: onChat,
-                            borderRadius: BorderRadius.circular(
-                              scale(context, 12),
+                          const Spacer(),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: r.s(10),
+                              vertical: r.vs(4),
                             ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.30),
+                              borderRadius: BorderRadius.circular(r.s(12)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  MdiIcons.clockOutline,
+                                  size: r.ms(12),
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: r.s(4)),
+                                Text(
+                                  item.timeLeft,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: r.ms(10),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: gap),
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: r.ms(20),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: r.vs(4)),
+                      Text(
+                        item.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.95),
+                          fontSize: r.ms(13),
+                          fontWeight: FontWeight.w500,
+                          height: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          Expanded(
                             child: Container(
                               padding: EdgeInsets.symmetric(
-                                vertical: vScale(context, 10),
+                                horizontal: r.s(12),
+                                vertical: r.vs(10),
                               ),
                               decoration: BoxDecoration(
-                                color: Tprimary,
-                                borderRadius: BorderRadius.circular(
-                                  scale(context, 12),
+                                color: Colors.white.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(r.s(12)),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.25),
+                                  width: 1,
                                 ),
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    "Book Now",
-                                    style: TextStyle(
-                                      fontSize: mScale(context, 14),
-                                      fontWeight: FontWeight.w800,
-                                      color: TonPrimary,
+                                  Icon(
+                                    MdiIcons.tagOutline,
+                                    size: r.ms(16),
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: r.s(8)),
+                                  Expanded(
+                                    child: Text(
+                                      item.code,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: r.ms(15),
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.8,
+                                      ),
                                     ),
                                   ),
-                                  SizedBox(width: scale(context, 5)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: r.s(10)),
+                          GestureDetector(
+                            onTap: onCopy,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: r.s(12),
+                                vertical: r.vs(10),
+                              ),
+                              decoration: BoxDecoration(
+                                color: copied
+                                    ? const Color(0xCC4CD964)
+                                    : Colors.white.withOpacity(0.25),
+                                borderRadius: BorderRadius.circular(r.s(12)),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.30),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    copied
+                                        ? MdiIcons.check
+                                        : MdiIcons.contentCopy,
+                                    size: r.ms(14),
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: r.s(6)),
+                                  Text(
+                                    copied ? "Copied!" : "Copy",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: r.ms(12),
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: gap),
+                      Align(
+                        alignment: Alignment.center,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: GestureDetector(
+                            onTap: onClaim,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: r.s(16),
+                                vertical: r.vs(8),
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(r.s(15)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "Claim Offer",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: r.ms(14),
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  SizedBox(width: r.s(8)),
                                   Icon(
                                     MdiIcons.arrowRight,
-                                    size: mScale(context, 16),
-                                    color: TonPrimary,
+                                    size: r.ms(16),
+                                    color: Colors.black,
                                   ),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
+                Positioned(
+                  bottom: -30,
+                  right: -30,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.10),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: -20,
+                  left: -20,
+                  child: CustomPaint(
+                    size: const Size(60, 60),
+                    painter: _TrianglePainter(
+                      color: Colors.white.withOpacity(0.10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-// -------------------- SIMPLE BELL BADGE --------------------
-class _BellBadge extends StatelessWidget {
-  final int count;
-  final Color bg;
-  final Color iconColor;
-  final Color badgeBg;
-  final Color badgeText;
-  final VoidCallback onTap;
-  final double size;
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+  _TrianglePainter({required this.color});
 
-  const _BellBadge({
-    required this.count,
-    required this.bg,
-    required this.iconColor,
-    required this.badgeBg,
-    required this.badgeText,
-    required this.onTap,
-    required this.size,
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = color;
+    final path = Path();
+    path.moveTo(size.width / 2, 0);
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    canvas.drawPath(path, p);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PropertyCard extends StatelessWidget {
+  final R r;
+  final Toks T;
+  final PropertyItem p;
+  final bool liked;
+  final VoidCallback onLike;
+  final VoidCallback onView;
+  final VoidCallback onBook;
+
+  const _PropertyCard({
+    required this.r,
+    required this.T,
+    required this.p,
+    required this.liked,
+    required this.onLike,
+    required this.onView,
+    required this.onBook,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(size / 2),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(size / 2),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(r.s(20), 0, r.s(20), r.vs(20)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: T.elevated,
+          borderRadius: BorderRadius.circular(r.s(20)),
+          border: Border.all(color: T.border, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
-            child: Icon(
-              MdiIcons.bellOutline,
-              size: size * 0.62,
-              color: iconColor,
-            ),
-          ),
-          if (count > 0)
-            Positioned(
-              top: -4,
-              right: -4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  "$count",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: badgeText,
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          children: [
+            SizedBox(
+              height: r.vs(180),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(p.asset, fit: BoxFit.cover),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      height: r.vs(180) * 0.50,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0xB3000000)],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: r.s(15),
+                    left: r.s(15),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: r.s(12),
+                        vertical: r.vs(6),
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(r.s(20)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.20),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        p.price,
+                        style: TextStyle(
+                          fontSize: r.ms(14),
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: r.s(15),
+                    right: r.s(15),
+                    child: GestureDetector(
+                      onTap: onLike,
+                      child: Container(
+                        width: r.s(40),
+                        height: r.s(40),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.30),
+                          borderRadius: BorderRadius.circular(r.s(20)),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          liked ? MdiIcons.heart : MdiIcons.heartOutline,
+                          size: r.ms(22),
+                          color: liked ? const Color(0xFFFF4757) : Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: r.s(15),
+                    right: r.s(15),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: r.s(10),
+                        vertical: r.vs(4),
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.60),
+                        borderRadius: BorderRadius.circular(r.s(20)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            MdiIcons.star,
+                            size: r.ms(12),
+                            color: const Color(0xFFFFD700),
+                          ),
+                          SizedBox(width: r.s(4)),
+                          Text(
+                            p.rating.toStringAsFixed(1),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: r.ms(12),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
+            Padding(
+              padding: EdgeInsets.all(r.s(15)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    p.title,
+                    style: TextStyle(
+                      fontSize: r.ms(18),
+                      fontWeight: FontWeight.w800,
+                      color: T.onBackground,
+                    ),
+                  ),
+                  SizedBox(height: r.vs(5)),
+                  Row(
+                    children: [
+                      Icon(
+                        MdiIcons.mapMarkerOutline,
+                        size: r.ms(12),
+                        color: T.muted,
+                      ),
+                      SizedBox(width: r.s(5)),
+                      Expanded(
+                        child: Text(
+                          "${p.area} • ${p.distance}",
+                          style: TextStyle(fontSize: r.ms(12), color: T.muted),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: r.vs(10)),
+                  Wrap(
+                    spacing: r.s(8),
+                    runSpacing: r.vs(5),
+                    children: p.features
+                        .map(
+                          (f) => Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: r.s(10),
+                              vertical: r.vs(5),
+                            ),
+                            decoration: BoxDecoration(
+                              color: T.ripple,
+                              borderRadius: BorderRadius.circular(r.s(15)),
+                            ),
+                            child: Text(
+                              f,
+                              style: TextStyle(
+                                fontSize: r.ms(11),
+                                fontWeight: FontWeight.w600,
+                                color: T.onBackground,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  SizedBox(height: r.vs(15)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(r.s(12)),
+                          onTap: () {
+                            context.pushNamed('propertydetails');
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: r.vs(10)),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(r.s(12)),
+                              border: Border.all(color: T.border, width: 1),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              "View Details",
+                              style: TextStyle(
+                                fontSize: r.ms(14),
+                                fontWeight: FontWeight.w700,
+                                color: T.onBackground,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(width: r.s(10)),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: onBook,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: r.vs(10)),
+                            decoration: BoxDecoration(
+                              color: T.primary,
+                              borderRadius: BorderRadius.circular(r.s(12)),
+                            ),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "Book Now",
+                                  style: TextStyle(
+                                    fontSize: r.ms(14),
+                                    fontWeight: FontWeight.w800,
+                                    color: T.onPrimary,
+                                  ),
+                                ),
+                                SizedBox(width: r.s(5)),
+                                Icon(
+                                  MdiIcons.arrowRight,
+                                  size: r.ms(16),
+                                  color: T.onPrimary,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

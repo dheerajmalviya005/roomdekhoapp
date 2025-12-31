@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../home_screen_component/home_screen.dart';
-
-class WishListScreen extends StatelessWidget {
-  const WishListScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _Demo(label: "Wishlist");
-}
+import '../wishlist_screen_component/wishlist_screen.dart';
+import '../profile_screen_component/tenant_profile_screen.dart';
+import '../chat_screen_componenet/chats_list_screen.dart';
 
 class SupportScreen extends StatelessWidget {
   const SupportScreen({super.key});
@@ -14,17 +11,6 @@ class SupportScreen extends StatelessWidget {
   Widget build(BuildContext context) => const _Demo(label: "Support");
 }
 
-class ChatListScreen extends StatelessWidget {
-  const ChatListScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _Demo(label: "Chat");
-}
-
-class TenantProfileScreen extends StatelessWidget {
-  const TenantProfileScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _Demo(label: "Profile");
-}
 
 class _Demo extends StatelessWidget {
   final String label;

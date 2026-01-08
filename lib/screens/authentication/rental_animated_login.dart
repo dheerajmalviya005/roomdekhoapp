@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import '../../services/auth_service.dart'; // Add this
+import '../../widgets/error_toast.dart';
 
 class RentalAnimatedLogin extends StatefulWidget {
   const RentalAnimatedLogin({super.key});
@@ -164,7 +166,9 @@ class _RentalAnimatedLoginState extends State<RentalAnimatedLogin>
     super.dispose();
   }
 
+  // Replace your current _onLogin() method with this
   Future<void> _onLogin() async {
+    // Clear errors
     setState(() {
       _emailError = '';
       _passError = '';
@@ -174,31 +178,106 @@ class _RentalAnimatedLoginState extends State<RentalAnimatedLogin>
     final email = _emailCtrl.text.trim();
     final pass = _passCtrl.text.trim();
 
+    // Validation
     if (email.isEmpty) {
       setState(() => _emailError = 'Please enter email / phone');
+      return;
     }
     if (pass.isEmpty) {
       setState(() => _passError = 'Please enter password');
+      return;
     }
-    if (email.isEmpty || pass.isEmpty) return;
 
     setState(() => _loading = true);
-    _btnFillCtrl.forward(from: 0);
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      print('\n🔄 STARTING LOGIN PROCESS...');
 
-      if (!mounted) return;
+      // Call AuthService
+      final result = await AuthService.loginUser(email, pass);
 
-      context.go('/bottomnav');
+      print('\n🔄 LOGIN RESULT RECEIVED');
+      print('Success: ${result["success"]}');
+      print('Role in payload: ${result["payload"]?["role"]}');
+
+      if (result["success"] == true) {
+        final token = result["token"];
+        final role = result["payload"]?["role"] ?? "UNKNOWN";
+
+        print('\n✅ LOGIN COMPLETE SUCCESSFULLY!');
+        print('✅ Token: ${AuthService.maskToken(token)}');
+        print('✅ User Role: $role');
+
+        // Show role-based success message
+        String welcomeMessage = "Welcome!";
+        if (role == 'OWNER') {
+          welcomeMessage = "Welcome Owner!";
+        } else if (role == 'TENANT') {
+          welcomeMessage = "Welcome Tenant!";
+        }
+
+        ErrorToast.show(
+          context,
+          message: "Login successful!\n$welcomeMessage",
+          title: "Success",
+          icon: Icons.check_circle,
+          accent: Colors.green,
+        );
+
+        // Print current token from memory
+        AuthService.printCurrentToken();
+
+        // ✅ Get navigation path based on role
+        final navigationPath = AuthService.getNavigationPath();
+        print('\n📍 NAVIGATING TO: $navigationPath');
+
+        // Show navigation info
+        await Future.delayed(const Duration(seconds: 1));
+
+        // Navigate based on role
+        if (mounted) {
+          // Show brief message about where user is going
+          if (role == 'OWNER') {
+            ErrorToast.show(
+              context,
+              message: "Redirecting to Owner Dashboard...",
+              title: "Owner Access",
+              icon: Icons.business,
+              accent: Colors.blue,
+              duration: const Duration(seconds: 1),
+            );
+          } else if (role == 'TENANT') {
+            ErrorToast.show(
+              context,
+              message: "Redirecting to Tenant Dashboard...",
+              title: "Tenant Access",
+              icon: Icons.home,
+              accent: Colors.green,
+              duration: const Duration(seconds: 1),
+            );
+          }
+
+          // Navigate after showing message
+          await Future.delayed(const Duration(seconds: 1));
+          context.go(navigationPath);
+        }
+      } else {
+        print('\n❌ LOGIN FAILED');
+
+        String errorMessage = result["message"] ?? "Login failed";
+        setState(() => _apiError = errorMessage);
+
+        ErrorToast.show(context, message: errorMessage, title: "Failed");
+      }
     } catch (e) {
-      setState(() {
-        _apiError = 'Login failed, please try again';
-      });
+      print('\n❌ LOGIN EXCEPTION: $e');
+
+      ErrorToast.show(context, message: "Something went wrong", title: "Error");
+
+      setState(() => _apiError = "An error occurred");
     } finally {
       if (mounted) {
         setState(() => _loading = false);
-        _btnFillCtrl.reverse();
       }
     }
   }
@@ -720,35 +799,35 @@ class _RentalAnimatedLoginState extends State<RentalAnimatedLogin>
                                         ),
                                         child: Row(
                                           children: [
-                                            Expanded(
-                                              child: _SocialButton(
-                                                icon: Icons.g_mobiledata,
-                                                iconColor: const Color(
-                                                  0xFFDB4437,
-                                                ),
-                                                label: 'Google',
-                                                border: border,
-                                                elevated: elevated,
-                                                textColor: onSurface,
-                                                vScale: vScale,
-                                                mScale: mScale,
-                                              ),
-                                            ),
+                                            // Expanded(
+                                            //   child: _SocialButton(
+                                            //     icon: Icons.g_mobiledata,
+                                            //     iconColor: const Color(
+                                            //       0xFFDB4437,
+                                            //     ),
+                                            //     label: 'Google',
+                                            //     border: border,
+                                            //     elevated: elevated,
+                                            //     textColor: onSurface,
+                                            //     vScale: vScale,
+                                            //     mScale: mScale,
+                                            //   ),
+                                            // ),
                                             SizedBox(width: scale(8)),
-                                            Expanded(
-                                              child: _SocialButton(
-                                                icon: Icons.facebook,
-                                                iconColor: const Color(
-                                                  0xFF1877F2,
-                                                ),
-                                                label: 'Facebook',
-                                                border: border,
-                                                elevated: elevated,
-                                                textColor: onSurface,
-                                                vScale: vScale,
-                                                mScale: mScale,
-                                              ),
-                                            ),
+                                            // Expanded(
+                                            //   child: _SocialButton(
+                                            //     icon: Icons.facebook,
+                                            //     iconColor: const Color(
+                                            //       0xFF1877F2,
+                                            //     ),
+                                            //     label: 'Facebook',
+                                            //     border: border,
+                                            //     elevated: elevated,
+                                            //     textColor: onSurface,
+                                            //     vScale: vScale,
+                                            //     mScale: mScale,
+                                            //   ),
+                                            // ),
                                           ],
                                         ),
                                       ),

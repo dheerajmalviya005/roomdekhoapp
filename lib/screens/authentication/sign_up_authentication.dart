@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:go_router/go_router.dart';
+import "../../services/auth_service.dart";
 
 class SignUpAuthenticationScreen extends StatefulWidget {
   const SignUpAuthenticationScreen({super.key});
@@ -229,34 +230,69 @@ class _SignUpAuthenticationScreenState extends State<SignUpAuthenticationScreen>
 
     final normalizedRole = _normalizeRole(_role);
 
-    // yahi payload aap API ko bhej sakte ho
     final payload = {
-      'first_name': _nullIfEmpty(_firstNameCtrl.text),
-      'last_name': _nullIfEmpty(_lastNameCtrl.text),
-      'phone': _nullIfEmpty(_phoneCtrl.text),
-      'email': _nullIfEmpty(_emailCtrl.text),
-      'password': _passCtrl.text,
-      'role': normalizedRole,
+      "first_name": _nullIfEmpty(_firstNameCtrl.text),
+      "last_name": _nullIfEmpty(_lastNameCtrl.text),
+      "phone": _nullIfEmpty(_phoneCtrl.text),
+      "email": _nullIfEmpty(_emailCtrl.text),
+      "password": _passCtrl.text,
+      "role": normalizedRole,
     };
 
-    try {
-      await Future.delayed(const Duration(seconds: 1)); // fake delay
+    // ✅ console logs
+    // ignore: avoid_print
+    print("🟦 REGISTER button clicked");
+    // ignore: avoid_print
+    print("🟦 role label=$_role => normalized=$normalizedRole");
+    // ignore: avoid_print
+    print("🟦 payload => $payload");
 
-      if (mounted) {
+    try {
+      final res = await AuthService.registerUser(payload);
+
+      // ignore: avoid_print
+      print("🟩 register result => $res");
+
+      final ok = res["ok"] == true;
+
+      if (!mounted) return;
+
+      if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully')),
+          const SnackBar(content: Text("Account created successfully")),
         );
-      }
-    } catch (e) {
-      if (mounted) {
+
+        // ✅ optional: go to login after register
+        context.go("/login");
+      } else {
+        final data = res["data"];
+        String msg = "Registration failed";
+
+        if (data is Map) {
+          msg =
+              (data["detail"] ??
+                      data["message"] ??
+                      data["error"] ??
+                      data["msg"] ??
+                      "Registration failed")
+                  .toString();
+        } else if (data != null) {
+          msg = data.toString();
+        }
+
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ).showSnackBar(SnackBar(content: Text("Error: $msg")));
       }
+    } catch (e) {
+      // ignore: avoid_print
+      print("🟥 register exception => $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 

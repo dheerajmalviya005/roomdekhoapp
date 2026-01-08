@@ -1,27 +1,28 @@
-import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../home_screen_component/home_screen.dart';
-import '../wishlist_screen_component/wishlist_screen.dart';
-import '../profile_screen_component/tenant_profile_screen.dart';
-import '../chat_screen_componenet/chats_list_screen.dart';
+import "dart:ui";
+import "package:flutter/material.dart";
+import "package:material_design_icons_flutter/material_design_icons_flutter.dart";
 
-class SupportScreen extends StatelessWidget {
-  const SupportScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _Demo(label: "Support");
-}
-
+import "../home_screen_component/home_screen.dart";
+import "../wishlist_screen_component/wishlist_screen.dart";
+import "../profile_screen_component/tenant_profile_screen.dart";
+import "../chat_screen_componenet/chats_list_screen.dart";
+import '../../common_support_screen.dart';
 
 class _Demo extends StatelessWidget {
   final String label;
   const _Demo({required this.label});
   @override
   Widget build(BuildContext context) {
-    return Center(child: Text(label, style: const TextStyle(fontSize: 18)));
+    return Center(
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+    );
   }
 }
 
-// ---------------- COLORS (same) ----------------
+/* ---------------- Theme tokens ---------------- */
 class T {
   static const primary = Color(0xFF667EEA);
   static const primaryLight = Color(0xFF764BA2);
@@ -32,67 +33,84 @@ class T {
   static const lightGray = Color(0xFFF8F9FA);
   static const darkGray = Color(0xFF6B7280);
   static const black = Color(0xFF1F2937);
-  static const shadow = Color(0x1A000000);
-  static const success = Color(0xFF10B981);
-  static const info = Color(0xFF3B82F6);
-  static const warning = Color(0xFFF59E0B);
+
+  static const shadow = Color(0x10000000);
 }
 
-// ---------------- TAB CONFIG (same) ----------------
+/* ---------------- Responsive scale helpers (same as your upper code) ---------------- */
+class S {
+  static const double _baseWidth = 375.0;
+  static const double _baseHeight = 812.0;
+
+  static double _w(BuildContext c) => MediaQuery.of(c).size.width;
+  static double _h(BuildContext c) => MediaQuery.of(c).size.height;
+
+  static double scale(BuildContext c, double v) => v * (_w(c) / _baseWidth);
+  static double verticalScale(BuildContext c, double v) =>
+      v * (_h(c) / _baseHeight);
+
+  static double moderateScale(BuildContext c, double v, {double factor = 0.5}) {
+    final s = scale(c, v);
+    return v + (s - v) * factor;
+  }
+}
+
+/* ---------------- Tab config ---------------- */
 class TabItemConfig {
   final String name;
+  final String label;
   final IconData icon;
   final IconData activeIcon;
   final List<Color> gradient;
-  final String label;
 
   const TabItemConfig({
     required this.name,
+    required this.label,
     required this.icon,
     required this.activeIcon,
     required this.gradient,
-    required this.label,
   });
 }
 
 final List<TabItemConfig> TAB_CONFIG = [
   TabItemConfig(
     name: "Home",
+    label: "Home",
     icon: MdiIcons.layersOutline,
     activeIcon: MdiIcons.layers,
-    gradient: [Color(0xFF667EEA), Color(0xFF764BA2)],
-    label: "Home",
+    gradient: const [Color(0xFF667EEA), Color(0xFF764BA2)],
   ),
   TabItemConfig(
     name: "WishList",
+    label: "Wishlist",
     icon: MdiIcons.heartOutline,
     activeIcon: MdiIcons.heart,
-    gradient: [Color(0xFFF97373), Color(0xFFF43F5E)],
-    label: "Wishlist",
+    gradient: const [Color(0xFFF97373), Color(0xFFF43F5E)],
   ),
   TabItemConfig(
     name: "Support",
+    label: "Support",
     icon: MdiIcons.headset,
     activeIcon: MdiIcons.headset,
-    gradient: [Color(0xFF43E97B), Color(0xFF38F9D7)],
-    label: "Support",
+    gradient: const [Color(0xFF43E97B), Color(0xFF38F9D7)],
   ),
   TabItemConfig(
     name: "Chat",
+    label: "Chat",
     icon: MdiIcons.messageOutline,
     activeIcon: MdiIcons.message,
-    gradient: [Color(0xFFF093FB), Color(0xFFF5576C)],
-    label: "Chat",
+    gradient: const [Color(0xFFF093FB), Color(0xFFF5576C)],
   ),
   TabItemConfig(
     name: "Profile",
+    label: "Profile",
     icon: MdiIcons.accountOutline,
     activeIcon: MdiIcons.account,
-    gradient: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
-    label: "Profile",
+    gradient: const [Color(0xFF4FACFE), Color(0xFF00F2FE)],
   ),
 ];
 
+/* ---------------- BottomNavShell (same idea as upper code) ---------------- */
 class BottomNavShell extends StatefulWidget {
   const BottomNavShell({super.key});
 
@@ -100,10 +118,8 @@ class BottomNavShell extends StatefulWidget {
   State<BottomNavShell> createState() => _BottomNavShellState();
 }
 
-class _BottomNavShellState extends State<BottomNavShell>
-    with WidgetsBindingObserver {
+class _BottomNavShellState extends State<BottomNavShell> {
   int _index = 0;
-  bool _keyboardVisible = false;
 
   final _pages = const [
     HomeScreen(),
@@ -114,187 +130,233 @@ class _BottomNavShellState extends State<BottomNavShell>
   ];
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeMetrics() {
-    final bottomInset = WidgetsBinding
-        .instance
-        .platformDispatcher
-        .views
-        .first
-        .viewInsets
-        .bottom;
-    final visible = bottomInset > 0;
-    if (visible != _keyboardVisible) {
-      setState(() => _keyboardVisible = visible);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
-      body: _pages[_index],
-      extendBody: true,
-      bottomNavigationBar: _keyboardVisible
-          ? null
-          : _CustomGlassTabBar(
-              currentIndex: _index,
-              onTap: (i) => setState(() => _index = i),
-            ),
-    );
-  }
-}
-
-class _CustomGlassTabBar extends StatelessWidget {
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-
-  const _CustomGlassTabBar({required this.currentIndex, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
-
-    return SafeArea(
-      top: false,
-      child: Stack(
+      extendBody: true, // ✅ IMPORTANT for glass
+      body: Stack(
         children: [
-          Positioned(
-            left: 35,
-            right: 35,
-            top: 0,
-            child: Container(
-              height: 1.5,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(0.75),
-                gradient: LinearGradient(
-                  colors: [
-                    T.primary.withOpacity(0.10),
-                    T.primaryLight.withOpacity(0.05),
-                    Colors.transparent,
-                  ],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-              ),
-            ),
-          ),
+          IndexedStack(index: _index, children: _pages),
 
-          Padding(
-            padding: EdgeInsets.only(
-              left: 10,
-              right: 10,
-              bottom: isIOS ? 8 : 4,
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color.fromRGBO(255, 255, 255, 0.44),
-                borderRadius: BorderRadius.circular(26),
-              ),
-              child: SizedBox(
-                height: 64,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: List.generate(TAB_CONFIG.length, (i) {
-                    final cfg = TAB_CONFIG[i];
-                    final focused = currentIndex == i;
-
-                    return Expanded(
-                      child: InkWell(
-                        onTap: () => onTap(i),
-                        borderRadius: BorderRadius.circular(26),
-                        child: _TabItem(cfg: cfg, focused: focused),
-                      ),
-                    );
-                  }),
-                ),
+          if (!keyboardVisible)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _CustomTabBar(
+                currentIndex: _index,
+                onChange: (i) => setState(() => _index = i),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _TabItem extends StatelessWidget {
-  final TabItemConfig cfg;
-  final bool focused;
+/* ---------------- Custom Tab Bar (same-to-same like your upper code) ---------------- */
+class _CustomTabBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onChange;
 
-  const _TabItem({required this.cfg, required this.focused});
+  const _CustomTabBar({required this.currentIndex, required this.onChange});
 
   @override
   Widget build(BuildContext context) {
-    final labelColor = focused ? cfg.gradient[0] : T.darkGray;
+    final pb = MediaQuery.of(context).padding.bottom;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Transform.translate(
-          offset: Offset(0, focused ? -5 : 0),
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: focused
-                  ? [
-                      BoxShadow(
-                        color: T.primary.withOpacity(0.30),
-                        blurRadius: 6,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: focused
-                ? Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        colors: cfg.gradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+    final containerPaddingBottom =
+        (Theme.of(context).platform == TargetPlatform.iOS)
+        ? S.verticalScale(context, 8)
+        : S.verticalScale(context, 4);
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: S.scale(context, 12),
+          right: S.scale(context, 12),
+          bottom: containerPaddingBottom + (pb > 0 ? (pb * 0.15) : 0),
+        ),
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            // ✅ GLASS CARD (blur + border)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(S.scale(context, 26)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color.fromRGBO(255, 255, 255, 0.28),
+                    borderRadius: BorderRadius.circular(S.scale(context, 26)),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.35),
+                      width: 1,
                     ),
-                    child: Icon(cfg.activeIcon, size: 22, color: T.white),
-                  )
-                : Container(
-                    decoration: BoxDecoration(
-                      color: T.lightGray,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(cfg.icon, size: 20, color: T.darkGray),
                   ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 60, maxWidth: 80),
-          child: Text(
-            cfg.label,
-            maxLines: 1,
-            overflow: TextOverflow.clip,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: focused ? 12 : 11,
-              fontWeight: focused ? FontWeight.w700 : FontWeight.w500,
-              letterSpacing: 0.1,
-              color: labelColor,
+                  child: SizedBox(
+                    height: S.verticalScale(context, 64),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: List.generate(TAB_CONFIG.length, (i) {
+                        final cfg = TAB_CONFIG[i];
+                        final isFocused = i == currentIndex;
+
+                        return Expanded(
+                          child: InkWell(
+                            onTap: () => onChange(i),
+                            borderRadius: BorderRadius.circular(
+                              S.scale(context, 26),
+                            ),
+                            child: Center(
+                              child: SizedBox(
+                                height: S.verticalScale(context, 62),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: S.scale(context, 40),
+                                      height: S.scale(context, 40),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: isFocused
+                                              ? const Color(0xFFFFFFFF)
+                                              : const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(
+                                            S.scale(context, 20),
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                isFocused ? 0.22 : 0.10,
+                                              ),
+                                              offset: Offset(
+                                                0,
+                                                isFocused ? 4 : 2,
+                                              ),
+                                              blurRadius: isFocused ? 8 : 4,
+                                            ),
+                                          ],
+                                        ),
+                                        child: isFocused
+                                            ? _GradientIcon(
+                                                colors: cfg.gradient,
+                                                child: Icon(
+                                                  cfg.activeIcon,
+                                                  size: S.moderateScale(
+                                                    context,
+                                                    22,
+                                                  ),
+                                                  color: T.white,
+                                                ),
+                                              )
+                                            : Center(
+                                                child: Icon(
+                                                  cfg.icon,
+                                                  size: S.moderateScale(
+                                                    context,
+                                                    20,
+                                                  ),
+                                                  color: T.darkGray,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+
+                                    SizedBox(
+                                      height: S.verticalScale(context, 3),
+                                    ),
+
+                                    SizedBox(
+                                      height: S.verticalScale(context, 14),
+                                      child: Text(
+                                        cfg.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: S.moderateScale(
+                                            context,
+                                            11,
+                                          ),
+                                          height: 1.0,
+                                          fontWeight: isFocused
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: isFocused
+                                              ? cfg.gradient[0]
+                                              : T.darkGray,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
+
+            // ✅ subtle top glow line (same)
+            Positioned(
+              top: 0,
+              left: S.scale(context, 40),
+              right: S.scale(context, 40),
+              child: Container(
+                height: 1.5,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(0.75),
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      T.primary.withOpacity(0.10),
+                      T.primaryLight.withOpacity(0.05),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+/* ---------------- Gradient icon wrapper ---------------- */
+class _GradientIcon extends StatelessWidget {
+  final List<Color> colors;
+  final Widget child;
+
+  const _GradientIcon({required this.colors, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(S.scale(context, 20)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: colors.isNotEmpty
+              ? colors
+              : const [T.primary, T.primaryLight],
+        ),
+      ),
+      child: Center(child: child),
     );
   }
 }

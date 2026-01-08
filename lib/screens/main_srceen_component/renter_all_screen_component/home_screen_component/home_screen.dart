@@ -319,6 +319,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _copiedCode;
 
   final Map<String, bool> _liked = {};
+  late final ScrollController _scrollCtrl;
+  double _scrollY = 0;
 
   @override
   void initState() {
@@ -344,6 +346,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
+    _scrollCtrl = ScrollController()
+      ..addListener(() {
+        if (!mounted) return;
+        setState(() => _scrollY = _scrollCtrl.offset);
+      });
 
     _bannerPC = PageController(viewportFraction: 1.0)
       ..addListener(() {
@@ -377,6 +384,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _catCtrl.dispose();
     _posterCtrl.dispose();
     _cardCtrl.dispose();
+    _scrollCtrl.dispose();
+
     super.dispose();
   }
 
@@ -399,7 +408,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final mq = MediaQuery.of(context);
     final r = R(mq.size.width, mq.size.height);
     final T = Toks.fromTheme(context);
+    final double headerMaxH = r.vs(56); // aap yaha 50-70 adjust kar sakte ho
+    final double t = (_scrollY / headerMaxH).clamp(0.0, 1.0);
 
+    final double headerH = lerpDouble(headerMaxH, 0, t)!;
+    final double headerOpacity = lerpDouble(1, 0, t)!;
     final tabBarSpace = r.vs(80);
 
     final topProps = PROPERTIES.take(3).toList();
@@ -438,106 +451,124 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           body: Column(
             children: [
               // ---------------- Header (Animated) ----------------
-              FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: _headerCtrl,
-                  curve: Curves.easeOut,
-                ),
-                child: SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(0, -0.15),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
+              // ---------------- Header (Collapsible) ----------------
+              ClipRect(
+                child: SizedBox(
+                  height: headerH,
+                  child: IgnorePointer(
+                    ignoring: t > 0.98, // fully hidden => no taps
+                    child: Opacity(
+                      opacity: headerOpacity,
+                      child: FadeTransition(
+                        opacity: CurvedAnimation(
                           parent: _headerCtrl,
                           curve: Curves.easeOut,
                         ),
-                      ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: r.s(20),
-                      vertical: r.vs(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Icon(
-                                MdiIcons.mapMarkerRadius,
-                                size: r.ms(22),
-                                color: T.primary,
-                              ),
-                              SizedBox(width: r.s(10)),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Current Location",
-                                    style: TextStyle(
-                                      fontSize: r.ms(14),
-                                      fontWeight: FontWeight.w700,
-                                      color: T.onBackground,
-                                    ),
-                                  ),
-                                  SizedBox(height: r.vs(2)),
-                                  Text(
-                                    "University Campus Area",
-                                    style: TextStyle(
-                                      fontSize: r.ms(12),
-                                      color: T.muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // ✅ Notification / Bell (fixed size + look)
-                        GestureDetector(
-                          onTap: () {
-                            context.pushNamed('notification');
-                          },
-                          child: Container(
-                            width: r.s(36),
-                            height: r.s(36),
-                            decoration: BoxDecoration(
-                              color: T.elevated,
-                              borderRadius: BorderRadius.circular(r.s(14)),
-                              border: Border.all(color: T.border, width: 1),
-                            ),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              alignment: Alignment.center,
-                              children: [
-                                Icon(
-                                  MdiIcons.bellOutline,
-                                  size: r.ms(18),
-                                  color: T.onBackground,
+                        child: SlideTransition(
+                          position:
+                              Tween<Offset>(
+                                begin: const Offset(0, -0.15),
+                                end: Offset.zero,
+                              ).animate(
+                                CurvedAnimation(
+                                  parent: _headerCtrl,
+                                  curve: Curves.easeOut,
                                 ),
-                                Positioned(
-                                  right: r.s(2),
-                                  top: r.s(-3),
+                              ),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: r.s(20),
+                              vertical: r.vs(10),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        MdiIcons.mapMarkerRadius,
+                                        size: r.ms(22),
+                                        color: T.primary,
+                                      ),
+                                      SizedBox(width: r.s(10)),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "Current Location",
+                                            style: TextStyle(
+                                              fontSize: r.ms(14),
+                                              fontWeight: FontWeight.w700,
+                                              color: T.onBackground,
+                                            ),
+                                          ),
+                                          SizedBox(height: r.vs(2)),
+                                          Text(
+                                            "University Campus Area",
+                                            style: TextStyle(
+                                              fontSize: r.ms(12),
+                                              color: T.muted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () =>
+                                      context.pushNamed('notification'),
                                   child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: r.s(5),
-                                      vertical: r.vs(1.5),
-                                    ),
+                                    width: r.s(36),
+                                    height: r.s(36),
                                     decoration: BoxDecoration(
-                                      color: T.primary,
+                                      color: T.elevated,
                                       borderRadius: BorderRadius.circular(
-                                        r.s(10),
+                                        r.s(14),
+                                      ),
+                                      border: Border.all(
+                                        color: T.border,
+                                        width: 1,
                                       ),
                                     ),
-                                    child: Text(
-                                      "3",
-                                      style: TextStyle(
-                                        fontSize: r.ms(10),
-                                        fontWeight: FontWeight.w900,
-                                        color: T.onPrimary,
-                                      ),
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      alignment: Alignment.center,
+                                      children: [
+                                        Icon(
+                                          MdiIcons.bellOutline,
+                                          size: r.ms(18),
+                                          color: T.onBackground,
+                                        ),
+                                        Positioned(
+                                          right: r.s(2),
+                                          top: r.s(-3),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: r.s(5),
+                                              vertical: r.vs(1.5),
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: T.primary,
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    r.s(10),
+                                                  ),
+                                            ),
+                                            child: Text(
+                                              "3",
+                                              style: TextStyle(
+                                                fontSize: r.ms(10),
+                                                fontWeight: FontWeight.w900,
+                                                color: T.onPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -545,7 +576,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -688,6 +719,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               // ---------------- Content ----------------
               Expanded(
                 child: SingleChildScrollView(
+                  controller: _scrollCtrl,
                   padding: EdgeInsets.only(bottom: r.vs(16)),
                   child: Column(
                     children: [
@@ -882,7 +914,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     liked: _liked[p.id] ?? false,
                                     onLike: () => _toggleLike(p.id),
                                     onView: () {},
-                                    onBook: () {},
+                                    onBook: () {
+                                      final msg =
+                                          "Hi, I'm interested in booking this property:\n"
+                                          "🏠 ${p.title}\n"
+                                          "📍 ${p.area} • ${p.distance}\n"
+                                          "💰 ${p.price}\n"
+                                          "⭐ ${p.rating.toStringAsFixed(1)}\n"
+                                          "✅ ${p.features.join(", ")}\n\n"
+                                          "Please share availability & next steps.";
+
+                                      context.pushNamed(
+                                        'chat',
+                                        extra: {
+                                          "thread_type": "booking",
+                                          "prefill_message": msg,
+
+                                          // ✅ full property object (image + all fields)
+                                          "property": {
+                                            "id": p.id,
+                                            "title": p.title,
+                                            "area": p.area,
+                                            "price": p.price,
+                                            "rating": p.rating,
+                                            "distance": p.distance,
+                                            "asset": p.asset, // ✅ image path
+                                            "features": p.features, // ✅ list
+                                          },
+                                        },
+                                      );
+                                    },
                                   ),
                                 ),
                               ],
@@ -1190,7 +1251,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     liked: _liked[p.id] ?? false,
                                     onLike: () => _toggleLike(p.id),
                                     onView: () {},
-                                    onBook: () {},
+                                    onBook: () {
+                                      final msg =
+                                          "Hi, I'm interested in booking this property:\n"
+                                          "🏠 ${p.title}\n"
+                                          "📍 ${p.area} • ${p.distance}\n"
+                                          "💰 ${p.price}\n"
+                                          "⭐ ${p.rating.toStringAsFixed(1)}\n"
+                                          "✅ ${p.features.join(", ")}\n\n"
+                                          "Please share availability & next steps.";
+
+                                      context.pushNamed(
+                                        'chat',
+                                        extra: {
+                                          "thread_type": "booking",
+                                          "prefill_message": msg,
+
+                                          // ✅ full property object (image + all fields)
+                                          "property": {
+                                            "id": p.id,
+                                            "title": p.title,
+                                            "area": p.area,
+                                            "price": p.price,
+                                            "rating": p.rating,
+                                            "distance": p.distance,
+                                            "asset": p.asset, // ✅ image path
+                                            "features": p.features, // ✅ list
+                                          },
+                                        },
+                                      );
+                                    },
                                   ),
                                 ),
                               ],

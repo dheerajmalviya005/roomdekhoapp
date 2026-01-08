@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
@@ -1506,6 +1505,7 @@ class _ListItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.sub,
+
     this.onTap,
     this.last = false,
   });
@@ -1654,7 +1654,7 @@ class _ListSwitch extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: T.onPrimary,
+            activeThumbColor: T.onPrimary,
             activeTrackColor: T.primary,
             inactiveThumbColor: Colors.grey.shade300,
             inactiveTrackColor: T.disabled,

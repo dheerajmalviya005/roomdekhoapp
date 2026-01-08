@@ -238,7 +238,7 @@ class _RentalForgotPasswordScreenState extends State<RentalForgotPasswordScreen>
     final accent = scheme.secondary;
     final surface = scheme.surface;
     final onSurface = scheme.onSurface;
-    final onBackground = scheme.onSurface;
+    // final onBackground = scheme.onSurface;
     final onPrimary = scheme.onPrimary;
 
     final border = scheme.outlineVariant;

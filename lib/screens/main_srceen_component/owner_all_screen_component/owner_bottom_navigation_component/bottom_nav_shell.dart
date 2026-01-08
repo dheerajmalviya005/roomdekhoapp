@@ -1,12 +1,16 @@
 import "dart:ui";
 import "package:flutter/material.dart";
 import "package:material_design_icons_flutter/material_design_icons_flutter.dart";
+import '../home_screen_comp_owner/owner_home_flutter.dart';
+import '../../renter_all_screen_component/chat_screen_componenet/chats_list_screen.dart';
+import '../owner_profile_component/profile_screen.dart';
+import '../../common_support_screen.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-/* ---------------- Theme tokens (same as RN) ---------------- */
+/* ---------------- Theme tokens ---------------- */
 class T {
   static const primary = Color(0xFF667EEA);
   static const primaryLight = Color(0xFF764BA2);
@@ -18,7 +22,6 @@ class T {
   static const darkGray = Color(0xFF6B7280);
   static const black = Color(0xFF1F2937);
 
-  // shadow: "#00000010" => 0x10000000 (alpha 0x10)
   static const shadow = Color(0x10000000);
 
   static const success = Color(0xFF10B981);
@@ -26,9 +29,8 @@ class T {
   static const warning = Color(0xFFF59E0B);
 }
 
-/* ---------------- Responsive scale helpers (RN-like) ---------------- */
+/* ---------------- Responsive scale helpers ---------------- */
 class S {
-  // Base width similar to common mobile design base
   static const double _baseWidth = 375.0;
   static const double _baseHeight = 812.0;
 
@@ -39,14 +41,13 @@ class S {
   static double verticalScale(BuildContext c, double v) =>
       v * (_h(c) / _baseHeight);
 
-  // moderateScale ~ blend of scale + original value
   static double moderateScale(BuildContext c, double v, {double factor = 0.5}) {
     final s = scale(c, v);
     return v + (s - v) * factor;
   }
 }
 
-/* ---------------- Tab config (same as RN) ---------------- */
+/* ---------------- Tab config ---------------- */
 class TabItemConfig {
   final String name;
   final String label;
@@ -63,8 +64,6 @@ class TabItemConfig {
   });
 }
 
-// ❌ const List<TabItemConfig> TAB_CONFIG = [ ... ];
-// ✅ change to:
 final List<TabItemConfig> TAB_CONFIG = [
   TabItemConfig(
     name: "Home",
@@ -83,14 +82,14 @@ final List<TabItemConfig> TAB_CONFIG = [
   TabItemConfig(
     name: "Chat",
     label: "Chat",
-    icon: MdiIcons.messageText,
+    icon: MdiIcons.messageTextOutline,
     activeIcon: MdiIcons.messageText,
     gradient: const [Color(0xFFF093FB), Color(0xFFF5576C)],
   ),
   TabItemConfig(
     name: "Profile",
     label: "Profile",
-    icon: MdiIcons.account,
+    icon: MdiIcons.accountOutline,
     activeIcon: MdiIcons.account,
     gradient: const [Color(0xFF4FACFE), Color(0xFF00F2FE)],
   ),
@@ -113,58 +112,21 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/* ---------------- Screens (replace with your actual screens) ---------------- */
-// Replace these with:
-// import '.../renter_home.dart';
-// import '.../create_room_screen.dart';
-// import '.../support_screen.dart';
-// import '.../profile_screen.dart';
-// import '.../chat_list_screen.dart';
+// /* ---------------- Common demo widget (ONLY shows screen name) ---------------- */
+// class _Demo extends StatelessWidget {
+//   final String label;
+//   const _Demo({required this.label, super.key});
 
-class RenterHome extends StatelessWidget {
-  const RenterHome({super.key});
-  @override
-  Widget build(BuildContext context) => const _DemoScreen(title: "Home");
-}
-
-class RentalSupportScreen extends StatelessWidget {
-  const RentalSupportScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _DemoScreen(title: "Support");
-}
-
-class ChatsListScreen extends StatelessWidget {
-  const ChatsListScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _DemoScreen(title: "Chat");
-}
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _DemoScreen(title: "Profile");
-}
-
-class CreateRoomScreen extends StatelessWidget {
-  const CreateRoomScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const _DemoScreen(title: "Create Room");
-}
-
-class _DemoScreen extends StatelessWidget {
-  final String title;
-  const _DemoScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Center(
+//       child: Text(
+//         label,
+//         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+//       ),
+//     );
+//   }
+// }
 
 /* ---------------- Main Tabs (custom bottom bar) ---------------- */
 class RenterTabs extends StatefulWidget {
@@ -178,10 +140,10 @@ class _RenterTabsState extends State<RenterTabs> {
   int index = 0;
 
   final List<Widget> pages = const [
-    RenterHome(),
-    RentalSupportScreen(),
-    ChatsListScreen(),
-    ProfileScreen(),
+    RenterHomeFlutter(),
+    SupportScreen(),
+    ChatListScreen(),
+    ProfileScreenFlutter(),
   ];
 
   @override
@@ -189,12 +151,11 @@ class _RenterTabsState extends State<RenterTabs> {
     final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
+      extendBody: true, // ✅ IMPORTANT for glass
       body: Stack(
         children: [
-          // keep state alive like tab navigator
           IndexedStack(index: index, children: pages),
 
-          // Custom tab bar overlay
           if (!keyboardVisible)
             Positioned(
               left: 0,
@@ -211,7 +172,7 @@ class _RenterTabsState extends State<RenterTabs> {
   }
 }
 
-/* ---------------- Custom Tab Bar (same style) ---------------- */
+/* ---------------- Custom Tab Bar (GLASS PROPER) ---------------- */
 class _CustomTabBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onChange;
@@ -227,8 +188,8 @@ class _CustomTabBar extends StatelessWidget {
         ? S.verticalScale(context, 8)
         : S.verticalScale(context, 4);
 
-    return IgnorePointer(
-      ignoring: false,
+    return SafeArea(
+      top: false,
       child: Padding(
         padding: EdgeInsets.only(
           left: S.scale(context, 12),
@@ -238,113 +199,131 @@ class _CustomTabBar extends StatelessWidget {
         child: Stack(
           alignment: Alignment.topCenter,
           children: [
-            // Floating glass card wrapper
-            Container(
-              decoration: BoxDecoration(
-                color: const Color.fromRGBO(255, 255, 255, 0.44), // glass
-                borderRadius: BorderRadius.circular(S.scale(context, 26)),
-              ),
-              child: SizedBox(
-                height: S.verticalScale(context, 64),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: List.generate(TAB_CONFIG.length, (i) {
-                    final cfg = TAB_CONFIG[i];
-                    final isFocused = i == currentIndex;
+            // ✅ GLASS CARD (blur + border + glow)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(S.scale(context, 26)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), // ✅ GLASS
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color.fromRGBO(255, 255, 255, 0.28),
+                    borderRadius: BorderRadius.circular(S.scale(context, 26)),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: SizedBox(
+                    height: S.verticalScale(context, 64),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: List.generate(TAB_CONFIG.length, (i) {
+                        final cfg = TAB_CONFIG[i];
+                        final isFocused = i == currentIndex;
 
-                    return Expanded(
-                      child: InkWell(
-                        onTap: () => onChange(i),
-                        borderRadius: BorderRadius.circular(
-                          S.scale(context, 26),
-                        ),
-                        child: SizedBox(
-                          height: double.infinity,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Transform.translate(
-                                offset: Offset(0, isFocused ? -5 : 0),
-                                child: Container(
-                                  width: S.scale(context, 40),
-                                  height: S.scale(context, 40),
-                                  margin: EdgeInsets.only(
-                                    bottom: S.verticalScale(context, 4),
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isFocused
-                                        ? const Color(0xFFFFFFFF)
-                                        : const Color(0xFFF3F4F6),
-                                    borderRadius: BorderRadius.circular(
-                                      S.scale(context, 20),
+                        return Expanded(
+                          child: InkWell(
+                            onTap: () => onChange(i),
+                            borderRadius: BorderRadius.circular(
+                              S.scale(context, 26),
+                            ),
+                            child: Center(
+                              child: SizedBox(
+                                height: S.verticalScale(context, 62),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: S.scale(context, 40),
+                                      height: S.scale(context, 40),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: isFocused
+                                              ? const Color(0xFFFFFFFF)
+                                              : const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(
+                                            S.scale(context, 20),
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                isFocused ? 0.22 : 0.10,
+                                              ),
+                                              offset: Offset(
+                                                0,
+                                                isFocused ? 4 : 2,
+                                              ),
+                                              blurRadius: isFocused ? 8 : 4,
+                                            ),
+                                          ],
+                                        ),
+                                        child: isFocused
+                                            ? _GradientIcon(
+                                                colors: cfg.gradient,
+                                                child: Icon(
+                                                  cfg.activeIcon,
+                                                  size: S.moderateScale(
+                                                    context,
+                                                    22,
+                                                  ),
+                                                  color: T.white,
+                                                ),
+                                              )
+                                            : Center(
+                                                child: Icon(
+                                                  cfg.icon,
+                                                  size: S.moderateScale(
+                                                    context,
+                                                    20,
+                                                  ),
+                                                  color: T.darkGray,
+                                                ),
+                                              ),
+                                      ),
                                     ),
-                                    boxShadow: [
-                                      if (isFocused)
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.25),
-                                          offset: const Offset(0, 4),
-                                          blurRadius: 8,
-                                        )
-                                      else
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.12),
-                                          offset: const Offset(0, 2),
-                                          blurRadius: 4,
-                                        ),
-                                    ],
-                                  ),
-                                  child: isFocused
-                                      ? _GradientIcon(
-                                          colors: cfg.gradient,
-                                          child: Icon(
-                                            cfg.activeIcon,
-                                            size: S.moderateScale(context, 22),
-                                            color: T.white,
+
+                                    SizedBox(
+                                      height: S.verticalScale(context, 3),
+                                    ),
+
+                                    SizedBox(
+                                      height: S.verticalScale(context, 14),
+                                      child: Text(
+                                        cfg.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: S.moderateScale(
+                                            context,
+                                            11,
                                           ),
-                                        )
-                                      : Center(
-                                          child: Icon(
-                                            cfg.icon,
-                                            size: S.moderateScale(context, 20),
-                                            color: T.darkGray,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                              SizedBox(
-                                width: S.scale(context, 80),
-                                child: Text(
-                                  cfg.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.clip,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: isFocused
-                                        ? S.moderateScale(context, 12)
-                                        : S.moderateScale(context, 11),
-                                    fontWeight: isFocused
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    letterSpacing: 0.1,
-                                    color: isFocused
-                                        ? (cfg.gradient.isNotEmpty
+                                          height: 1.0,
+                                          fontWeight: isFocused
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: isFocused
                                               ? cfg.gradient[0]
-                                              : T.primary)
-                                        : T.darkGray,
-                                  ),
+                                              : T.darkGray,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  }),
+                        );
+                      }),
+                    ),
+                  ),
                 ),
               ),
             ),
 
-            // subtle top glow line
+            // subtle top glow line (same as before)
             Positioned(
               top: 0,
               left: S.scale(context, 40),

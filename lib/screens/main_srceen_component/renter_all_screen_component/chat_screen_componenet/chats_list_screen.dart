@@ -75,7 +75,6 @@ class _G extends StatelessWidget {
   final Alignment end;
 
   const _G({
-    super.key,
     required this.colors,
     required this.child,
     this.radius,
@@ -446,6 +445,15 @@ class _ChatsListScreenState extends State<ChatListScreen>
                         children: [
                           _IconBtn(
                             r: r,
+                            onTap: () => _openWallpaperModal(
+                              context,
+                              r,
+                              isDark,
+                              onBg,
+                              muted,
+                              border,
+                            ),
+                            shadow: whiteGlowSoft(r),
                             child: _G(
                               colors: isDark
                                   ? [
@@ -465,19 +473,12 @@ class _ChatsListScreenState extends State<ChatListScreen>
                                 ),
                               ),
                             ),
-                            onTap: () => _openWallpaperModal(
-                              context,
-                              r,
-                              isDark,
-                              onBg,
-                              muted,
-                              border,
-                            ),
-                            shadow: whiteGlowSoft(r),
                           ),
                           SizedBox(width: r.s(10)),
                           _IconBtn(
                             r: r,
+                            onTap: () {},
+                            shadow: whiteGlowStrong(r),
                             child: _G(
                               colors: primaryGradient,
                               radius: BorderRadius.circular(r.s(12)),
@@ -489,8 +490,6 @@ class _ChatsListScreenState extends State<ChatListScreen>
                                 ),
                               ),
                             ),
-                            onTap: () {},
-                            shadow: whiteGlowStrong(r),
                           ),
                         ],
                       ),

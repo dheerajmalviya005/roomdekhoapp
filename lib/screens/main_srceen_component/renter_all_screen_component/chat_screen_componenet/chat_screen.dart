@@ -1,7 +1,9 @@
-import 'dart:math' as math;
-import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 const String me = "u1";
 const String peer = "u2";
@@ -34,7 +36,7 @@ class _SepItem {
   const _SepItem({required this.id, required this.createdAt});
 }
 
-/// Responsive scaler (same concept)
+/// Responsive scaler
 class R {
   final double w;
   final double h;
@@ -50,7 +52,6 @@ bool isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
 String fmtDate(DateTime d) {
-  // "02 Dec 2025"
   const months = [
     "Jan",
     "Feb",
@@ -70,15 +71,12 @@ String fmtDate(DateTime d) {
 }
 
 String fmtTime(DateTime d) {
-  // HH:MM
   final hh = d.hour.toString().padLeft(2, "0");
   final mm = d.minute.toString().padLeft(2, "0");
   return "$hh:$mm";
 }
 
-/// ====== THEME MODEL (same keys as RN T.*) ======
-/// IMPORTANT: keep your app theme mapping here so design stays identical.
-/// If you already have theme tokens, replace values in `ThemeTokens.fromContext`.
+/// ====== THEME TOKENS ======
 class ThemeTokens {
   final Color background;
   final Color elevated;
@@ -113,7 +111,6 @@ class ThemeTokens {
     required this.disabled,
   });
 
-  /// Replace this mapping with your exact palette if you already have it
   factory ThemeTokens.fromContext(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (isDark) {
@@ -185,11 +182,13 @@ class ChatScreenFlutter extends StatefulWidget {
 class _ChatScreenFlutterState extends State<ChatScreenFlutter>
     with TickerProviderStateMixin {
   late List<ChatMessage> messages;
+
   String input = "";
   bool online = true;
   bool showEmoji = false;
 
   Map<String, dynamic>? queuedListing;
+  String? queuedImage;
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
@@ -205,6 +204,8 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
   late final AnimationController inputCtrl;
   late final AnimationController msgCtrl;
   late final AnimationController scrollBtnCtrl;
+
+  final bool _didPrefill = false;
 
   @override
   void initState() {
@@ -311,6 +312,40 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
     });
   }
 
+  Map<String, dynamic>? _prefillProperty;
+  String _prefillMessage = "";
+  bool _didInitPrefill = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didInitPrefill) return;
+    _didInitPrefill = true;
+
+    final extraObj = GoRouterState.of(context).extra;
+
+    if (extraObj is Map) {
+      final extra = Map<String, dynamic>.from(extraObj);
+
+      _prefillMessage = (extra["prefill_message"] ?? "").toString();
+
+      final p = extra["property"];
+      if (p is Map) _prefillProperty = Map<String, dynamic>.from(p);
+    }
+
+    if (_prefillMessage.isNotEmpty) {
+      _ctrl.text = _prefillMessage;
+      _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
+    }
+    // ✅ If coming from Book Now, show it near input (not top)
+    if (_prefillProperty != null && queuedListing == null) {
+      setState(() {
+        queuedListing = _prefillProperty; // input ke paas preview ke liye
+        _prefillProperty = null; // top card band
+      });
+    }
+  }
+
   @override
   void dispose() {
     _ctrl.dispose();
@@ -356,41 +391,62 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
   }
 
   void onSend() {
-    final text = input.trim();
-    if (text.isEmpty && queuedListing == null) return;
+    final text = _ctrl.text.trim();
+
+    // nothing to send
+    if (text.isEmpty && queuedListing == null && queuedImage == null) return;
 
     setState(() {
-      if (queuedListing != null) {
+      // ✅ If an image is queued, send it as one message with optional caption
+      if (queuedImage != null) {
         messages.add(
           ChatMessage(
-            id: "list-${DateTime.now().millisecondsSinceEpoch}",
+            id: "img-${DateTime.now().millisecondsSinceEpoch}",
             userId: me,
-            text: "",
-            createdAt: DateTime.now().subtract(const Duration(milliseconds: 1)),
-            status: "sent",
-            type: "listing",
-            listing: queuedListing,
-          ),
-        );
-        queuedListing = null;
-      }
-
-      if (text.isNotEmpty) {
-        messages.add(
-          ChatMessage(
-            id: "m${DateTime.now().millisecondsSinceEpoch}",
-            userId: me,
-            text: text,
+            image: queuedImage,
+            text: text, // caption
             createdAt: DateTime.now(),
             status: "sent",
           ),
         );
+        queuedImage = null;
+        queuedListing = null; // optional: clear listing on send
+        _ctrl.clear();
+        input = "";
+      } else {
+        // ✅ If only listing is queued (and no image), send listing message
+        if (queuedListing != null) {
+          messages.add(
+            ChatMessage(
+              id: "lst-${DateTime.now().millisecondsSinceEpoch}",
+              userId: me,
+              text: text, // optional message with listing
+              createdAt: DateTime.now(),
+              status: "sent",
+              type: "listing",
+              listing: queuedListing,
+            ),
+          );
+          queuedListing = null;
+          _ctrl.clear();
+          input = "";
+        } else if (text.isNotEmpty) {
+          // ✅ Normal text
+          messages.add(
+            ChatMessage(
+              id: "m${DateTime.now().millisecondsSinceEpoch}",
+              userId: me,
+              text: text,
+              createdAt: DateTime.now(),
+              status: "sent",
+            ),
+          );
+          _ctrl.clear();
+          input = "";
+        }
       }
 
-      input = "";
-      _ctrl.clear();
       showEmoji = false;
-
       _rebuildGallery();
     });
 
@@ -400,18 +456,9 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
   void onAttach() {
     final uri =
         "https://picsum.photos/600/400?random=${math.Random().nextInt(9999)}";
+
     setState(() {
-      messages.add(
-        ChatMessage(
-          id: "m${DateTime.now().millisecondsSinceEpoch}",
-          userId: me,
-          text: "",
-          image: uri,
-          createdAt: DateTime.now(),
-          status: "sent",
-        ),
-      );
-      _rebuildGallery();
+      queuedImage = uri; // ✅ just queue, don't send yet
     });
   }
 
@@ -472,7 +519,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                               onTap: () => Navigator.of(context).maybePop(),
                             ),
                             SizedBox(width: r.s(12)),
-
                             Expanded(
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(r.s(14)),
@@ -493,7 +539,7 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                         image: const DecorationImage(
                                           image: AssetImage(
                                             "assets/icon/splash.png",
-                                          ), // same idea as ImageIcon
+                                          ),
                                           fit: BoxFit.cover,
                                         ),
                                       ),
@@ -556,7 +602,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                 ),
                               ),
                             ),
-
                             SizedBox(width: r.s(10)),
                             _IconSquare(
                               r: r,
@@ -586,7 +631,7 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                     opacity: msgCtrl.drive(CurveTween(curve: Curves.easeOut)),
                     child: ListView.separated(
                       controller: _scroll,
-                      reverse: true, // inverted like RN
+                      reverse: true,
                       padding: EdgeInsets.fromLTRB(
                         r.s(16),
                         r.vs(16),
@@ -645,7 +690,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
 
                         final isMe = m.userId == me;
 
-                        // avatar logic like RN (simplified with time gap)
                         bool showAvatar = false;
                         if (!isMe) {
                           final next = index + 1 < dataWithSeparators.length
@@ -704,7 +748,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                               ),
                               SizedBox(width: r.s(8)),
                             ],
-
                             Flexible(
                               child: Column(
                                 crossAxisAlignment: isMe
@@ -726,7 +769,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                         ),
                                       ),
                                     ),
-
                                   Container(
                                     padding: EdgeInsets.symmetric(
                                       horizontal: r.s(14),
@@ -796,7 +838,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                           ),
                                           SizedBox(height: r.vs(8)),
                                         ],
-
                                         if (m.text.trim().isNotEmpty)
                                           Text(
                                             m.text,
@@ -808,9 +849,7 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                               height: 1.35,
                                             ),
                                           ),
-
                                         SizedBox(height: r.vs(6)),
-
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           mainAxisAlignment:
@@ -830,8 +869,8 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                             if (isMe) ...[
                                               SizedBox(width: r.s(4)),
                                               Icon(
-                                                m.status == "read" ||
-                                                        m.status == "delivered"
+                                                (m.status == "read" ||
+                                                        m.status == "delivered")
                                                     ? Icons.done_all
                                                     : Icons.check,
                                                 size: r.ms(14),
@@ -856,7 +895,8 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                 ),
 
                 // ===== Queued listing preview =====
-                if (queuedListing != null)
+                // ===== Queued image preview (WhatsApp style) =====
+                if (queuedImage != null)
                   FadeTransition(
                     opacity: inputCtrl.drive(CurveTween(curve: Curves.easeOut)),
                     child: Container(
@@ -879,7 +919,7 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                             children: [
                               Expanded(
                                 child: Text(
-                                  "Sending Property",
+                                  "Sending Photo",
                                   style: TextStyle(
                                     color: T.onBackground,
                                     fontWeight: FontWeight.w700,
@@ -888,8 +928,7 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                 ),
                               ),
                               InkWell(
-                                onTap: () =>
-                                    setState(() => queuedListing = null),
+                                onTap: () => setState(() => queuedImage = null),
                                 child: Icon(
                                   Icons.close,
                                   color: T.muted,
@@ -899,11 +938,14 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                             ],
                           ),
                           SizedBox(height: r.vs(12)),
-                          _ListingCardFlutter(
-                            r: r,
-                            T: T,
-                            listing: queuedListing!,
-                            compact: true,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(r.s(14)),
+                            child: CachedNetworkImage(
+                              imageUrl: queuedImage!,
+                              height: r.vs(140),
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ],
                       ),
@@ -957,7 +999,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                           onTap: onAttach,
                         ),
                         SizedBox(width: r.s(8)),
-
                         Expanded(
                           child: Container(
                             padding: EdgeInsets.symmetric(horizontal: r.s(12)),
@@ -985,8 +1026,9 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                                       hintStyle: TextStyle(color: T.muted),
                                     ),
                                     onTap: () {
-                                      if (showEmoji)
+                                      if (showEmoji) {
                                         setState(() => showEmoji = false);
+                                      }
                                     },
                                   ),
                                 ),
@@ -1010,18 +1052,23 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                             ),
                           ),
                         ),
-
                         SizedBox(width: r.s(8)),
-
                         _SendBtn(
                           r: r,
                           enabled:
-                              input.trim().isNotEmpty || queuedListing != null,
-                          bg: (input.trim().isNotEmpty || queuedListing != null)
+                              _ctrl.text.trim().isNotEmpty ||
+                              queuedListing != null ||
+                              queuedImage != null,
+                          bg:
+                              (_ctrl.text.trim().isNotEmpty ||
+                                  queuedListing != null ||
+                                  queuedImage != null)
                               ? T.primary
                               : T.disabled,
                           iconColor:
-                              (input.trim().isNotEmpty || queuedListing != null)
+                              (_ctrl.text.trim().isNotEmpty ||
+                                  queuedListing != null ||
+                                  queuedImage != null)
                               ? T.onPrimary
                               : T.onBackground,
                           onTap: onSend,
@@ -1030,7 +1077,6 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
                     ),
                   ),
                 ),
-
                 SizedBox(height: r.vs(4)),
               ],
             ),
@@ -1134,6 +1180,267 @@ class _ChatScreenFlutterState extends State<ChatScreenFlutter>
   }
 }
 
+class BookingPropertyPreviewCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const BookingPropertyPreviewCard({super.key, required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (data["title"] ?? "").toString();
+    final area = (data["area"] ?? "").toString();
+    final distance = (data["distance"] ?? "").toString();
+    final price = (data["price"] ?? "").toString();
+    final rating = (data["rating"] ?? 0).toString();
+    final asset = (data["asset"] ?? "").toString();
+
+    final featuresRaw = data["features"];
+    final features = (featuresRaw is List)
+        ? featuresRaw.map((e) => e.toString()).toList()
+        : <String>[];
+
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: cs.outlineVariant.withOpacity(0.55)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          children: [
+            // -------- TOP IMAGE AREA (like your card) --------
+            SizedBox(
+              height: 170,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    asset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.black12,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.image_not_supported_outlined),
+                    ),
+                  ),
+
+                  // bottom fade like screenshot
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      height: 170 * 0.52,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0xB3000000)],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // price badge (top-left)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.18),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        price,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // heart (top-right) - just UI (no action)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Icon(
+                        Icons.favorite_border,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+
+                  // rating badge (bottom-right)
+                  Positioned(
+                    bottom: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.60),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star,
+                            size: 14,
+                            color: Color(0xFFFFD700),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            rating,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // -------- BOTTOM DETAILS AREA --------
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: cs.onSurface.withOpacity(0.55),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          "$area • $distance",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withOpacity(0.60),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (features.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: features.map((f) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: cs.primary.withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            f,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {},
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: cs.outlineVariant.withOpacity(0.6),
+                          ),
+                          color: Colors.transparent,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          "View Details",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// ====== SMALL UI WIDGETS ======
 class _IconSquare extends StatelessWidget {
   final R r;
@@ -1205,7 +1512,7 @@ class _SendBtn extends StatelessWidget {
   }
 }
 
-/// ===== Listing Card (same look idea) =====
+/// ===== Listing Card =====
 class _ListingCardFlutter extends StatelessWidget {
   final R r;
   final ThemeTokens T;
@@ -1244,7 +1551,6 @@ class _ListingCardFlutter extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // placeholder image
                 Image.asset("assets/icon/splash.png", fit: BoxFit.cover),
                 Positioned.fill(
                   child: DecoratedBox(
@@ -1395,7 +1701,7 @@ class _ListingCardFlutter extends StatelessWidget {
   }
 }
 
-/// ====== Gallery Overlay (simple) ======
+/// ====== Gallery Overlay ======
 class _GalleryOverlay extends StatefulWidget {
   final R r;
   final ThemeTokens T;
@@ -1460,7 +1766,6 @@ class _GalleryOverlayState extends State<_GalleryOverlay> {
                   );
                 },
               ),
-
               Positioned(
                 top: widget.r.s(10),
                 right: widget.r.s(10),
@@ -1484,7 +1789,6 @@ class _GalleryOverlayState extends State<_GalleryOverlay> {
                   ),
                 ),
               ),
-
               Positioned(
                 bottom: widget.r.s(20),
                 left: 0,
@@ -1570,7 +1874,6 @@ class _OptionsSheet extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: r.vs(12)),
-
                     _OptionTile(
                       r: r,
                       T: T,
@@ -1590,7 +1893,6 @@ class _OptionsSheet extends StatelessWidget {
                       tone: T.warning,
                       onTap: onReport,
                     ),
-
                     SizedBox(height: r.vs(16)),
                     InkWell(
                       onTap: onClose,
@@ -1815,7 +2117,6 @@ class _ConfirmModal extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: r.vs(24)),
-
                     Row(
                       children: [
                         Expanded(
@@ -1891,6 +2192,152 @@ class _ConfirmModal extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SelectedListingPreview extends StatelessWidget {
+  final R r;
+  final ThemeTokens T;
+  final Map<String, dynamic> data;
+  final VoidCallback onClose;
+
+  const _SelectedListingPreview({
+    required this.r,
+    required this.T,
+    required this.data,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (data["title"] ?? "Property").toString();
+    final area = (data["area"] ?? "").toString();
+    final distance = (data["distance"] ?? "").toString();
+    final price = (data["price"] ?? "").toString();
+    final asset = (data["asset"] ?? "assets/icon/splash.png").toString();
+
+    return Container(
+      margin: EdgeInsets.fromLTRB(r.s(16), 0, r.s(16), r.vs(12)),
+      padding: EdgeInsets.all(r.s(12)),
+      decoration: BoxDecoration(
+        color: T.elevated,
+        borderRadius: BorderRadius.circular(r.s(16)),
+        border: Border.all(color: T.border, width: 1),
+        boxShadow: whiteGlow(r, op: 0.12, blur: 14, y: 6),
+      ),
+      child: Stack(
+        children: [
+          // content
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(r.s(12)),
+                child: Image.asset(
+                  asset,
+                  width: r.s(54),
+                  height: r.s(54),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: r.s(54),
+                    height: r.s(54),
+                    color: T.surface,
+                    alignment: Alignment.center,
+                    child: Icon(Icons.home, color: T.muted, size: r.ms(22)),
+                  ),
+                ),
+              ),
+              SizedBox(width: r.s(10)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Selected Property",
+                      style: TextStyle(
+                        color: T.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: r.ms(12),
+                      ),
+                    ),
+                    SizedBox(height: r.vs(3)),
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: T.onBackground,
+                        fontWeight: FontWeight.w900,
+                        fontSize: r.ms(14),
+                      ),
+                    ),
+                    SizedBox(height: r.vs(2)),
+                    Text(
+                      [
+                        area,
+                        distance,
+                      ].where((e) => e.trim().isNotEmpty).join(" • "),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: T.muted,
+                        fontWeight: FontWeight.w600,
+                        fontSize: r.ms(12),
+                      ),
+                    ),
+                    if (price.trim().isNotEmpty) ...[
+                      SizedBox(height: r.vs(6)),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: r.s(10),
+                          vertical: r.vs(5),
+                        ),
+                        decoration: BoxDecoration(
+                          color: T.primary.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(r.s(999)),
+                          border: Border.all(
+                            color: T.primary.withOpacity(0.25),
+                          ),
+                        ),
+                        child: Text(
+                          price,
+                          style: TextStyle(
+                            color: T.onBackground,
+                            fontWeight: FontWeight.w800,
+                            fontSize: r.ms(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // ✅ cross icon top-right
+          Positioned(
+            top: 0,
+            right: 0,
+            child: InkWell(
+              onTap: onClose,
+              borderRadius: BorderRadius.circular(r.s(12)),
+              child: Container(
+                width: r.s(30),
+                height: r.s(30),
+                decoration: BoxDecoration(
+                  color: T.surface,
+                  borderRadius: BorderRadius.circular(r.s(12)),
+                  border: Border.all(color: T.border, width: 1),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.close, color: T.muted, size: r.ms(18)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
